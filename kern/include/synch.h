@@ -165,6 +165,7 @@ struct rwlock {
         // (don't forget to mark things volatile as needed)
 	struct semaphore *reader_sem;
 	struct semaphore *writer_sem;
+	struct lock *wr_lock;	
 	
 	volatile unsigned reader_count; 
 };

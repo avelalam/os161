@@ -376,12 +376,14 @@ rwlock_create(const char *name){
 		return NULL;
 	}
 	
-	rwl->reader_sem = sem_create("readersem",0);
+	rwl->reader_sem = sem_create("readersem",1);
 	KASSERT(rwl->reader_sem != NULL);
 	
-	rwl->writer_sem = sem_create("writersem",0);
+	rwl->writer_sem = sem_create("writersem",1);
 	KASSERT(rwl->writer_sem != NULL);
 	
+	rwl->wr_lock = lock_create("writerlock");
+	KASSERT(rwl->wr_lock != NULL);	
 	rwl->reader_count = 0;
 	
 	return rwl;
@@ -394,7 +396,7 @@ rwlock_destroy(struct rwlock *rwl){
 	
 	sem_destroy(rwl->reader_sem);
 	sem_destroy(rwl->writer_sem);
-	
+	lock_destroy(rwl->wr_lock);
 	kfree(rwl->rwlock_name);
 	kfree(rwl);
 	
@@ -404,12 +406,14 @@ void rwlock_acquire_read(struct rwlock *rwl){
 		
 	KASSERT(rwl != NULL);
 	
+	lock_acquire(rwl->wr_lock);
 	P(rwl->reader_sem);
 	if(rwl->reader_count == 0){
 		P(rwl->writer_sem);
 	}
 	rwl->reader_count++;
 	V(rwl->reader_sem);
+	lock_release(rwl->wr_lock);
 }
 
 void rwlock_release_read(struct rwlock *rwl){
@@ -429,6 +433,8 @@ void rwlock_release_read(struct rwlock *rwl){
 void rwlock_acquire_write(struct rwlock *rwl){
 
 	KASSERT(rwl != NULL);
+	lock_acquire(rwl->wr_lock);
+	KASSERT(rwl->writer_sem->sem_count == 1);
 	P(rwl->writer_sem);
 
 }
@@ -436,7 +442,9 @@ void rwlock_acquire_write(struct rwlock *rwl){
 void rwlock_release_write(struct rwlock *rwl){
 	
 	KASSERT(rwl != NULL);
+	KASSERT(rwl->writer_sem->sem_count == 0);
 	V(rwl->writer_sem);
+	lock_release(rwl->wr_lock);
 }
 
 
