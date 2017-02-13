@@ -44,7 +44,21 @@
  * Called by the driver during initialization.
  */
 
+struct semaphore *male_sem;
+struct semaphore *female_sem;
+struct semaphore *matcher;
+struct lock *locker;
+	
 void whalemating_init() {
+
+	male_sem = sem_create("malesem", 0);
+	KASSERT(male_sem!= NULL);
+	female_sem = sem_create("femalesem", 0);
+	KASSERT(female_sem!=NULL);
+	matcher = sem_create("matchersem", 0);	
+	KASSERT(matcher != NULL);
+	locker = lock_create("locker");
+	KASSERT(locker != NULL);
 	return;
 }
 
@@ -59,7 +73,17 @@ whalemating_cleanup() {
 
 void
 male(uint32_t index)
-{
+{	
+	male_start(index);
+	P(male_sem);
+	male_end(index);
+	
+//	male_start(index);
+//	V(male_sem);
+//	V(male_sem);
+//	P(female_sem);
+//	P(matcher);	
+//	male_end(index);
 	(void)index;
 	/*
 	 * Implement this function by calling male_start and male_end when
@@ -70,7 +94,18 @@ male(uint32_t index)
 
 void
 female(uint32_t index)
-{
+{	
+	female_start(index);
+	P(female_sem);
+	female_end(index);
+
+//	female_start(index);
+//	V(female_sem);
+//	V(female_sem);
+//	P(male_sem);
+//	P(matcher);
+//	female_end(index);
+		
 	(void)index;
 	/*
 	 * Implement this function by calling female_start and female_end when
@@ -82,6 +117,17 @@ female(uint32_t index)
 void
 matchmaker(uint32_t index)
 {
+	matchmaker_start(index);
+	V(male_sem);
+	V(female_sem);
+	matchmaker_end(index);
+	
+//	matchmaker_start(index);
+//	V(matcher);
+//	V(matcher);
+//	P(male_sem);
+//	P(female_sem);
+//	matchmaker_end(index);
 	(void)index;
 	/*
 	 * Implement this function by calling matchmaker_start and matchmaker_end

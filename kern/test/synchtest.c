@@ -427,7 +427,8 @@ cvtest(int nargs, char **args)
 	}
 	spinlock_init(&status_lock);
 	test_status = TEST161_SUCCESS;
-
+	
+	kprintf_n("Starting NTHREADS loop...\n");
 	testval1 = NTHREADS-1;
 	for (i=0; i<NTHREADS; i++) {
 		kprintf_t(".");
@@ -436,6 +437,7 @@ cvtest(int nargs, char **args)
 			panic("cvt1: thread_fork failed: %s\n", strerror(result));
 		}
 	}
+	kprintf_n("Starting Ps on donesem...\n");
 	for (i=0; i<NTHREADS; i++) {
 		kprintf_t(".");
 		P(donesem);

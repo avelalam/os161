@@ -73,8 +73,17 @@
  * Called by the driver during initialization.
  */
 
+struct lock *qlocks[4];
+struct lock *jlock;
+		
 void
 stoplight_init() {
+	for(int i=0; i<4; i++){
+		qlocks[i] = lock_create("qlock");
+		KASSERT(qlocks[i] != NULL);
+	}
+	jlock = lock_create("jlock");
+	KASSERT(jlock != NULL);
 	return;
 }
 
@@ -88,7 +97,14 @@ void stoplight_cleanup() {
 
 void
 turnright(uint32_t direction, uint32_t index)
-{
+{	
+	lock_acquire(jlock);
+	lock_acquire(qlocks[direction]);
+	lock_release(jlock);
+	inQuadrant(direction, index);
+	leaveIntersection(index);	
+	lock_release(qlocks[direction]);
+	
 	(void)direction;
 	(void)index;
 	/*
@@ -98,7 +114,17 @@ turnright(uint32_t direction, uint32_t index)
 }
 void
 gostraight(uint32_t direction, uint32_t index)
-{
+{	
+	lock_acquire(jlock);
+	lock_acquire(qlocks[direction]);
+	lock_acquire(qlocks[(direction+3)%4]);
+	lock_release(jlock);
+	inQuadrant(direction, index);
+	inQuadrant((direction+3)%4, index);
+	leaveIntersection(index);
+	lock_release(qlocks[direction]);
+	lock_release(qlocks[(direction+3)%4]);
+
 	(void)direction;
 	(void)index;
 	/*
@@ -108,7 +134,19 @@ gostraight(uint32_t direction, uint32_t index)
 }
 void
 turnleft(uint32_t direction, uint32_t index)
-{
+{	
+	lock_acquire(jlock);
+	lock_acquire(qlocks[direction]);
+	lock_acquire(qlocks[(direction+3)%4]);
+	lock_acquire(qlocks[(direction+6)%4]);	
+	lock_release(jlock);
+	inQuadrant(direction, index);
+	inQuadrant((direction+3)%4, index);
+	inQuadrant((direction+6)%4, index);
+	leaveIntersection(index);
+	lock_release(qlocks[direction]);
+	lock_release(qlocks[(direction+3)%4]);
+	lock_release(qlocks[(direction+6)%4]);
 	(void)direction;
 	(void)index;
 	/*
