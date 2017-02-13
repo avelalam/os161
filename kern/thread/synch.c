@@ -426,8 +426,8 @@ void rwlock_release_read(struct rwlock *rwl){
 	if(rwl->reader_count == 0){
 		V(rwl->writer_sem);
 	}
-	V(rwl->writer_sem);
-	
+	V(rwl->reader_sem);
+	lock_release(rwl->wr_lock);	
 }
 
 void rwlock_acquire_write(struct rwlock *rwl){
