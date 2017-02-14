@@ -440,7 +440,6 @@ void rwlock_release_read(struct rwlock *rwl){
 		V(rwl->writer_sem);
 	}
 	V(rwl->reader_sem);
-	lock_release(rwl->wr_lock);	
 }
 
 void rwlock_acquire_write(struct rwlock *rwl){
