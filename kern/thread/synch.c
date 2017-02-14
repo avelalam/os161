@@ -446,7 +446,6 @@ void rwlock_acquire_write(struct rwlock *rwl){
 
 	KASSERT(rwl != NULL);
 	lock_acquire(rwl->wr_lock);
-	KASSERT(rwl->writer_sem->sem_count == 1);
 	P(rwl->writer_sem);
 
 }
