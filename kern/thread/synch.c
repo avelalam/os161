@@ -397,7 +397,8 @@ rwlock_create(const char *name){
 	rwl->wr_lock = lock_create("writerlock");
 	KASSERT(rwl->wr_lock != NULL);	
 	rwl->reader_count = 0;
-	
+	rwl->reader_count++;
+	rwl->reader_count--;	
 	return rwl;
 }
 
