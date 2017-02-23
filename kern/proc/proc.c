@@ -48,7 +48,8 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
-
+#include <kern/fcntl.h>
+#include <vfs.h>
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
@@ -62,7 +63,7 @@ struct proc *
 proc_create(const char *name)
 {
 	struct proc *proc;
-
+//	kprintf("creating proc\n");
 	proc = kmalloc(sizeof(*proc));
 	if (proc == NULL) {
 		return NULL;
@@ -72,7 +73,7 @@ proc_create(const char *name)
 		kfree(proc);
 		return NULL;
 	}
-
+	
 	proc->p_numthreads = 0;
 	spinlock_init(&proc->p_lock);
 
@@ -81,7 +82,23 @@ proc_create(const char *name)
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
-
+	
+	
+//	char con_name[4] = "con:";
+	/*filetable*/
+//	kprintf("opening stdin\n");
+//	proc->file_table[0]->mode = O_RDONLY;
+//	vfs_open(con_name, O_RDONLY, 0, &(proc->file_table[0]->fileobj));	
+	
+//	kprintf("opening stdout\n");
+//	proc->file_table[1]->mode = O_WRONLY;
+//	vfs_open(con_name, O_WRONLY, 0, &(proc->file_table[1]->fileobj));	
+	
+//	kprintf("openinf stderr\n");
+//	proc->file_table[2]->mode = O_WRONLY;
+//	vfs_open(con_name, O_RDONLY, 0, &(proc->file_table[2]->fileobj));	
+	
+//	kprintf("returning proc");
 	return proc;
 }
 
@@ -199,7 +216,9 @@ proc_create_runprogram(const char *name)
 	if (newproc == NULL) {
 		return NULL;
 	}
-
+	
+		
+	
 	/* VM fields */
 
 	newproc->p_addrspace = NULL;

@@ -59,6 +59,16 @@ struct vnode;
  * thread_switch needs to be able to fetch the current address space
  * without sleeping.
  */
+
+struct fh{
+	unsigned volatile offset;
+	unsigned mode;
+	unsigned num_refs;
+	struct vnode *fileobj;
+	struct lock *fh_lock;
+};
+
+
 struct proc {
 	char *p_name;			/* Name of this process */
 	struct spinlock p_lock;		/* Lock for this structure */
@@ -69,8 +79,10 @@ struct proc {
 
 	/* VFS */
 	struct vnode *p_cwd;		/* current working directory */
-
+	
 	/* add more material here as needed */
+
+	struct fh *file_table[64];
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */

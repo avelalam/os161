@@ -35,6 +35,7 @@
 #include <thread.h>
 #include <current.h>
 #include <syscall.h>
+#include <file_syscall.h>
 #include <copyinout.h>
 
 /*
@@ -81,8 +82,6 @@ syscall(struct trapframe *tf)
 	int callno;
 	int32_t retval;
 	int err;
-	int len,i;
-	char *data;
 
 	KASSERT(curthread != NULL);
 	KASSERT(curthread->t_curspl == 0);
@@ -110,15 +109,19 @@ syscall(struct trapframe *tf)
 		err = sys___time((userptr_t)tf->tf_a0,
 				 (userptr_t)tf->tf_a1);
 		break;
+
 	    case SYS_write:
-		err = 0;
-		len = (int) tf->tf_a2;
-		retval = len;
-		data = kmalloc(len+1);
-		copyin((userptr_t)tf->tf_a1, data, len);
-		for (i=0; i<len; i++) {
-                	putch(data[i]);
-        	}
+		err = sys_write((int)tf->tf_a0,
+			 (userptr_t)tf->tf_a1,
+			 (int)tf->tf_a2);
+//		err = 0;
+//		len = (int) tf->tf_a2;
+//		retval = len;
+//		data = kmalloc(len+1);
+//		copyin((userptr_t)tf->tf_a1, data, len);
+//		for (i=0; i<len; i++) {
+  //              	putch(data[i]);
+    //    	}
 		break;
 
 	    /* Add stuff here */

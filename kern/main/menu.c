@@ -873,7 +873,7 @@ menu_execute(char *line, int isargs)
 	char *command;
 	char *context;
 	int result;
-
+	
 	for (command = strtok_r(line, ";", &context);
 	     command != NULL;
 	     command = strtok_r(NULL, ";", &context)) {
@@ -913,7 +913,6 @@ void
 menu(char *args)
 {
 	char buf[64];
-
 	menu_execute(args, 1);
 
 	while (1) {
