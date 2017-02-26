@@ -85,17 +85,18 @@ runprogram(char *progname)
                 kprintf("initializing stdin\n");
                 curproc->file_table[0] = kmalloc(sizeof(struct fh));
 		curproc->file_table[0]->mode = O_RDONLY;
-//                err = vfs_open(con_name, O_RDONLY, 0, &(curproc->file_table[0]->fileobj));
-//        	if (err) {
-//                	kprintf("Could not open %s for stdin: %s\n",
-//                        con_name, strerror(err));
-//                	return -1;
-//        	}else{
-//			kprintf("opened %s for stdin\n", con_name);
-//		}
+                err = vfs_open(con_name, O_RDONLY, 0, &(curproc->file_table[0]->fileobj));
+        	if (err) {
+                	kprintf("Could not open %s for stdin: %s\n",
+                        con_name, strerror(err));
+                	return -1;
+        	}else{
+			kprintf("opened %s for stdin\n", con_name);
+		}
 
         }
         
+	con_name = kstrdup("con:");
         if(curproc->file_table[1]==NULL){
                 kprintf("initializing stdout\n");
                 curproc->file_table[1] = kmalloc(sizeof(struct fh));
@@ -108,17 +109,18 @@ runprogram(char *progname)
                 }
 	}
         
+	con_name = kstrdup("con:");
         if(curproc->file_table[2]==NULL){
                 kprintf("initializing stderr\n");
                 curproc->file_table[2] = kmalloc(sizeof(struct fh));
                 curproc->file_table[2]->mode = O_WRONLY;
                 err = vfs_open(con_name, O_WRONLY, 0, &(curproc->file_table[2]->fileobj));
-//        	if (err) {
-  //                      kprintf("Could not open %s for stderr\n",
-    //                    con_name);
-//			kprintf("%d\n",err);
-  //                      return -1;
-    //            }
+        	if (err) {
+                        kprintf("Could not open %s for stderr\n",
+                        con_name);
+			kprintf("%d\n",err);
+                        return -1;
+                }
 	}
 	
 	/* Load the executable. */
