@@ -10,7 +10,7 @@
 #include <synch.h>
 #include<vfs.h>
 
-int sys_write(int fd, userptr_t buf,int buflen,int32_t* retval){
+int sys_write(int fd, void* buf,int buflen,int32_t* retval){
 	
 	if(fd<0 || fd>63){
 		return EBADF;
@@ -31,7 +31,7 @@ int sys_write(int fd, userptr_t buf,int buflen,int32_t* retval){
 	uio_write.uio_space = proc_getas();
 	uio_write.uio_segflg = UIO_USERSPACE;
 	uio_write.uio_iovcnt = 1;
-	uio_write.uio_iov->iov_ubase = buf;
+	uio_write.uio_iov->iov_ubase = (userptr_t)buf;
 	uio_write.uio_iov->iov_len = len;
 	uio_write.uio_resid = len;
 		
@@ -41,6 +41,7 @@ int sys_write(int fd, userptr_t buf,int buflen,int32_t* retval){
           *retval=-1;
           return err;
         }
+	curproc->file_table[fd]->offset = uio_write.uio_resid;
        *retval=len-uio_write.uio_resid;
        	return 0; 
 }

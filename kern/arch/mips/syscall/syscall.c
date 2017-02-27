@@ -112,7 +112,7 @@ syscall(struct trapframe *tf)
 
 	    case SYS_write:
 		err = sys_write((int)tf->tf_a0,
-			 (userptr_t)tf->tf_a1,
+		       	 (void*) tf->tf_a1,
 			 (int)tf->tf_a2,&retval);
 //		err = 0;
 //		len = (int) tf->tf_a2;

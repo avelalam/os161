@@ -82,7 +82,7 @@ runprogram(char *progname)
 
 	char *con_name = kstrdup("con:");
         if(curproc->file_table[0]==NULL){
-                kprintf("initializing stdin\n");
+//                kprintf("initializing stdin\n");
                 curproc->file_table[0] = kmalloc(sizeof(struct fh));
 		curproc->file_table[0]->mode = O_RDONLY;
                 err = vfs_open(con_name, O_RDONLY, 0, &(curproc->file_table[0]->fileobj));
@@ -91,14 +91,14 @@ runprogram(char *progname)
                         con_name, strerror(err));
                 	return -1;
         	}else{
-			kprintf("opened %s for stdin\n", con_name);
+//			kprintf("opened %s for stdin\n", con_name);
 		}
 
         }
         
 	con_name = kstrdup("con:");
         if(curproc->file_table[1]==NULL){
-                kprintf("initializing stdout\n");
+ //               kprintf("initializing stdout\n");
                 curproc->file_table[1] = kmalloc(sizeof(struct fh));
                 curproc->file_table[1]->mode = O_WRONLY;
                 err = vfs_open(con_name, O_WRONLY, 0, &(curproc->file_table[1]->fileobj));
@@ -111,7 +111,7 @@ runprogram(char *progname)
         
 	con_name = kstrdup("con:");
         if(curproc->file_table[2]==NULL){
-                kprintf("initializing stderr\n");
+  //              kprintf("initializing stderr\n");
                 curproc->file_table[2] = kmalloc(sizeof(struct fh));
                 curproc->file_table[2]->mode = O_WRONLY;
                 err = vfs_open(con_name, O_WRONLY, 0, &(curproc->file_table[2]->fileobj));
