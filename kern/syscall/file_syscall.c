@@ -41,7 +41,7 @@ int sys_write(int fd, userptr_t buf,int buflen,int32_t* retval){
           *retval=-1;
           return err;
         }
-
+       *retval=len-uio_write.uio_resid;
        	return 0; 
 }
 
