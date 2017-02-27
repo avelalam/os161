@@ -10,8 +10,7 @@
 #include <synch.h>
 #include<vfs.h>
 
-int sys_write(int fd, void* buf,int buflen,int32_t* retval){
-	
+int sys_write(int fd, void* buf,int buflen){
 	if(fd<0 || fd>63){
 		return EBADF;
 	}
@@ -23,7 +22,6 @@ int sys_write(int fd, void* buf,int buflen,int32_t* retval){
 	char data[256];
 	err = copyin(buf, data, len);
 	if(err){
-                *retval=-1;
 		return err;
 	}
 	
@@ -38,35 +36,36 @@ int sys_write(int fd, void* buf,int buflen,int32_t* retval){
 	
 	err = VOP_WRITE((curproc->file_table[fd]->fileobj), &uio_write);		
         if(err){
-          *retval=-1;
-          return err;
+		return err;
         }
 	curproc->file_table[fd]->offset = uio_write.uio_resid;
-       *retval=len-uio_write.uio_resid;
-       	return 0; 
+       	return -(len-uio_write.uio_resid); 
 }
 
 
-int sys_open(char *filename,int flags,int *retval){
-          
-      struct fh *file_handle;
-   
-       file_handle=kmalloc(sizeof(struct fh));
-       
-     //  file_handle->offset= 
-         file_handle->mode=flags;
-         file_handle->num_refs=1;
-         file_handle->fh_lock=lock_create("sdjf");
-   
-        int fd=curproc->next_fd;        
+int sys_open(char *filename,int flags){
 
+	struct fh *file_handle;
+	int fd,err;
 
-      int err=vfs_open(filename,flags,0,&(curproc->file_table[fd]->fileobj));
-        if(err)return err;
- 
-      *retval=fd;
-       curproc->next_fd++;
-          return 0;  
+	fd = curproc->next_fd;	
+	file_handle=kmalloc(sizeof(struct fh));
+
+	//file_handle->offset= 
+	file_handle->mode=flags;
+	file_handle->num_refs=1;
+	file_handle->fh_lock=lock_create("sdjf");
+	
+	
+	err=vfs_open(filename,flags,0,&(file_handle->fileobj));
+        
+	if(err){
+		return err;
+	}
+	
+	curproc->file_table[fd] = file_handle;
+	curproc->next_fd++;
+	return -fd;  
 }
 
 

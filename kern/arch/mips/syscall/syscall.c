@@ -113,18 +113,19 @@ syscall(struct trapframe *tf)
 	    case SYS_write:
 		err = sys_write((int)tf->tf_a0,
 		       	 (void*) tf->tf_a1,
-			 (int)tf->tf_a2,&retval);
-//		err = 0;
-//		len = (int) tf->tf_a2;
-//		retval = len;
-//		data = kmalloc(len+1);
-//		copyin((userptr_t)tf->tf_a1, data, len);
-//		for (i=0; i<len; i++) {
-  //              	putch(data[i]);
-    //    	}
+			 (int)tf->tf_a2);
+		if(err<=0){
+			retval = -err;
+			err=0;
+		}	
 		break;
             case SYS_open:
-                err=sys_open((char*)tf->tf_a0,(int)tf->tf_a1,&retval);
+                err=sys_open((char*)tf->tf_a0,(int)tf->tf_a1);
+		if(err<=0){
+			retval = -err;
+			err=0;
+		}
+		break;
 	    /* Add stuff here */
 
 	    default:
