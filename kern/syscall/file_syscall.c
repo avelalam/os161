@@ -41,7 +41,7 @@ int sys_write(int fd, void* buf,int buflen,int32_t* retval){
           *retval=-1;
           return err;
         }
-	curproc->file_table[fd]->offset = uio_write.uio_resid;
+	curproc->file_table[fd]->offset +=len-uio_write.uio_resid;
        *retval=len-uio_write.uio_resid;
        	return 0; 
 }
