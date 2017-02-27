@@ -26,7 +26,6 @@ int sys_write(int fd, void* buf,int buflen){
 		return err;
 	}
 	
-	kprintf("writing\n");
 	uio_write.uio_rw = UIO_WRITE;
 	uio_write.uio_space = proc_getas();
 	uio_write.uio_segflg = UIO_USERSPACE;
@@ -41,7 +40,6 @@ int sys_write(int fd, void* buf,int buflen){
 		return err;
         }
 	curproc->file_table[fd]->offset = uio_write.uio_offset;
-	kprintf("done writing\n");
        	return -(len-uio_write.uio_resid); 
 }
 
