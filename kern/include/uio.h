@@ -102,7 +102,7 @@ struct uio {
  *       should not be interpreted;
  *   (2) uio_offset will have been incremented by the amount transferred;
  *   (3) uio_resid will have been decremented by the amount transferred;
- *   (4) uio_segflg, uio_rw, and uio_space will be unchanged.
+   (4) uio_segflg, uio_rw, and uio_space will be unchanged.
  *
  * uiomove() may be called repeatedly on the same uio to transfer
  * additional data until the available buffer space the uio refers to

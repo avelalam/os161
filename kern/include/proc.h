@@ -32,7 +32,7 @@
 
 /*
  * Definition of a process.
- *
+*
  * Note: curproc is defined by <current.h>.
  */
 
@@ -83,6 +83,7 @@ struct proc {
 	/* add more material here as needed */
 
 	struct fh *file_table[64];
+        int next_fd;
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */
