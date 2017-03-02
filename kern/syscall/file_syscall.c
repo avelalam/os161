@@ -10,6 +10,8 @@
 #include <synch.h>
 #include<vfs.h>
 #include <kern/fcntl.h>
+#include<kern/seek.h>
+#define EOF (-1)
 
 int sys_write(int fd, void* buf,int buflen){
 	if(fd<0 || fd>63){
@@ -123,3 +125,54 @@ int sys_read(int fd, void* buf, int buflen){
 	(void)buflen;
 	return 0;
 }
+
+off_t sys_lseek(int fd,int low_32,int high_32,int whence){
+
+  if(fd<0 || fd>63)return EBADF;
+  bool b=VOP_ISSEEKABLE(curproc->file_table[fd]->fileobj);
+  if(b==false)return ESPIPE;
+  if(whence!=SEEK_SET || whence!=SEEK_CUR || whence!=SEEK_END)return EINVAL;
+ 
+  long long pos=0;
+   pos=pos|high_32;
+   pos<<=32;
+   pos=pos|low_32; 
+  
+   if(whence==SEEK_SET){
+     curproc->file_table[fd]->offset=pos;
+  return -(curproc->file_table[fd]->offset);
+   } 
+  if(whence==SEEK_CUR){
+       curproc->file_table[fd]->offset+=pos;
+  return -(curproc->file_table[fd]->offset);
+  }
+  if(whence==SEEK_END){
+      curproc->file_table[fd]->offset=EOF+pos;
+  return -(curproc->file_table[fd]->offset);
+  }
+ 
+  return EINVAL;
+ return 0;
+ 
+}
+
+int sys_dup2(int oldfd,int newfd){
+
+ if(oldfd<0   || oldfd>63 || newfd<0 || newfd>63)return EBADF;
+
+  
+   if(curproc->file_table[newfd]->fileobj!=NULL){
+        vfs_close(curproc->file_table[newfd]->fileobj);
+    }
+    curproc->file_table[newfd]=curproc->file_table[oldfd];
+
+    return -(newfd);
+
+}
+
+
+
+
+
+
+

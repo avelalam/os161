@@ -137,6 +137,20 @@ syscall(struct trapframe *tf)
 			err=0;
 		}
 		break;
+           case SYS_lseek:
+                err=sys_lseek((int)tf->tf_a0,(int)tf->tf_a2,(int)tf->tf_a3,(int)tf-> tf_sp+16);
+                if(err<=0){
+                      retval= -err;
+                      err=0;
+                }
+                break;
+           case SYS_dup2:
+                err=sys_dup2((int)tf->tf_a0,(int)tf->tf_a1);
+                if(err<=0){
+                         retval= -err;
+                         err=0;
+                   }
+                break;
 	    /* Add stuff here */
 
 	    default:
