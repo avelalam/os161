@@ -104,7 +104,7 @@ int sys_read(int fd, void* buf, int buflen){
 	uio_read.uio_space = proc_getas();
 	uio_read.uio_segflg = UIO_USERSPACE;
 	uio_read.uio_iovcnt = 1;
-	uio_read.uio_iov->iov_ubase = (userptr_t)buf;
+   	uio_read.uio_iov->iov_ubase = (userptr_t)buf;
 	uio_read.uio_iov->iov_len = len;
 	uio_read.uio_resid = len;
 	uio_read.uio_offset = curproc->file_table[fd]->offset;
@@ -196,7 +196,26 @@ int sys_dup2(int oldfd,int newfd){
 
 }
 
-
+int sys_getcwd(char *buf,size_t buflen){
+ 
+  
+      struct uio uio_getcwd;    
+      uio_getcwd.uio_iovcnt=1;
+      uio_getcwd.uio_offset=0;
+      uio_getcwd.uio_resid=buflen;
+      uio_getcwd.uio_rw=UIO_READ;
+      uio_getcwd.uio_space=proc_getas();
+      uio_getcwd.uio_iov->iov_kbase = (char *)buf;
+      uio_getcwd.uio_iov->iov_len = buflen;
+    int err=vfs_getcwd(&uio_getcwd);
+     if(err){
+           return err;
+     }
+   
+    return -(buflen-uio_getcwd.uio_resid);
+   
+ 
+}
 
 
 
