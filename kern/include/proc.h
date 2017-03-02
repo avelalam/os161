@@ -70,8 +70,8 @@ struct fh{
 
 
 struct proc {
-	char *p_name;			/* Name of this process */
-	struct spinlock p_lock;		/* Lock for this structure */
+	char *p_name;			/* Name of this process */ 
+        struct spinlock p_lock;		/* Lock for this structure */
 	unsigned p_numthreads;		/* Number of threads in this process */
 
 	/* VM */
