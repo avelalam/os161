@@ -99,7 +99,6 @@ syscall(struct trapframe *tf)
 	 */
 
 	retval = 0;
-
 	switch (callno) {
 	    case SYS_reboot:
 		err = sys_reboot(tf->tf_a0);
@@ -111,13 +110,11 @@ syscall(struct trapframe *tf)
 		break;
 
 	    case SYS_write:
-		err = sys_write((int)tf->tf_a0,
-		       	 (void*) tf->tf_a1,
-			 (int)tf->tf_a2);
+		err = sys_write((int)tf->tf_a0,(char *) tf->tf_a1,(int)tf->tf_a2);
 		if(err<=0){
 			retval = -err;
 			err=0;
-		}	
+		}
 		break;
 
             case SYS_open:
@@ -137,6 +134,18 @@ syscall(struct trapframe *tf)
 			err=0;
 		}
 		break;
+
+	    case SYS_close:
+		err = sys_close((int)tf->tf_a0);
+		break;
+
+	    case SYS_chdir:
+		err = sys_chdir((char *)tf->tf_a0);
+		break;
+
+	    case SYS__exit:
+		err=0;
+		break;
 	    /* Add stuff here */
 
 	    default:
@@ -152,6 +161,7 @@ syscall(struct trapframe *tf)
 		 * userlevel to a return value of -1 and the error
 		 * code in errno.
 		 */
+		retval = -1;
 		tf->tf_v0 = err;
 		tf->tf_a3 = 1;      /* signal an error */
 	}

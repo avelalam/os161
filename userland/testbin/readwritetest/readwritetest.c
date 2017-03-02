@@ -65,8 +65,9 @@ main(int argc, char **argv)
 		err(1, "Failed to open file.\n");
 	}
 	nprintf(".");
-
+	printf("opening file\n");
 	len = write(fd, MAGIC, expected_len);
+	printf("opened file\n");
 	if(len != expected_len) {
 		err(1, "writetest expected to write %d bytes to readwritetest.dat."
 			" Syscall reports that it wrote %d bytes.\n"

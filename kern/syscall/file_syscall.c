@@ -11,7 +11,7 @@
 #include<vfs.h>
 #include <kern/fcntl.h>
 
-int sys_write(int fd, void* buf,int buflen){
+int sys_write(int fd, const void *buf,int buflen){
 	if(fd<0 || fd>63){
 		return EBADF;
 	}
@@ -25,7 +25,6 @@ int sys_write(int fd, void* buf,int buflen){
 	if(err){
 		return err;
 	}
-	
 	uio_write.uio_rw = UIO_WRITE;
 	uio_write.uio_space = proc_getas();
 	uio_write.uio_segflg = UIO_USERSPACE;
@@ -34,9 +33,10 @@ int sys_write(int fd, void* buf,int buflen){
 	uio_write.uio_iov->iov_len = len;
 	uio_write.uio_resid = len;
 	uio_write.uio_offset = curproc->file_table[fd]->offset;		
-	
+	//kprintf("writing\n");	
 	err = VOP_WRITE((curproc->file_table[fd]->fileobj), &uio_write);		
-        if(err){
+        //kprintf("done writing\n");
+	if(err){
 		return err;
         }
 	curproc->file_table[fd]->offset = uio_write.uio_offset;
@@ -79,7 +79,6 @@ int sys_open(char *filename,int flags){
 	file_handle->fileobj = fileobj;
 	curproc->file_table[fd] = file_handle;
 	curproc->next_fd++;
-	kprintf("opened\n");
 	return -fd;  
 }
 
@@ -121,5 +120,33 @@ int sys_read(int fd, void* buf, int buflen){
 	(void)fd;
 	(void)buf;
 	(void)buflen;
+	return 0;
+}
+
+int sys_close(int fd){
+	kprintf("closing\n");
+	if(fd>63 || fd <0){
+		return EBADF;
+	}	
+	if((curproc->file_table[fd]->num_refs == 1)){
+		vfs_close(curproc->file_table[fd]->fileobj);
+		kfree(curproc->file_table[fd]);
+		curproc->file_table[fd] = NULL;	
+	}else{
+		curproc->file_table[fd]->num_refs--;
+	}
+	(void)fd;
+	kprintf("closed\n");
+	return 0;
+}
+
+int sys_chdir(const void *pathname){
+
+	int err;
+	
+	err = vfs_chdir((char *)pathname);
+	if(err){
+		return err;
+	}
 	return 0;
 }
