@@ -61,7 +61,7 @@ struct vnode;
  */
 
 struct fh{
-	unsigned volatile offset;
+	off_t offset;
 	unsigned mode;
 	unsigned num_refs;
 	struct vnode *fileobj;

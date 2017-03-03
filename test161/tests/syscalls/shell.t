@@ -9,5 +9,5 @@ depends: [console]
 sys161:
   ram: 1M
 ---
-p /testbin/shelltest
-p /testbin/shelltest
+$ /testbin/shelltest
+$ /testbin/shelltest

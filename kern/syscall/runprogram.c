@@ -44,6 +44,7 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
+#include <synch.h>
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -85,7 +86,9 @@ runprogram(char *progname)
 //                kprintf("initializing stdin\n");
                 curproc->file_table[0] = kmalloc(sizeof(struct fh));
 		curproc->file_table[0]->mode = O_RDONLY;
-                err = vfs_open(con_name, O_RDONLY, 0, &(curproc->file_table[0]->fileobj));
+                curproc->file_table[0]->fh_lock = lock_create("stdin lock");
+		curproc->file_table[0]->num_refs = 1;
+		err = vfs_open(con_name, O_RDONLY, 0, &(curproc->file_table[0]->fileobj));
         	if (err) {
                 	kprintf("Could not open %s for stdin: %s\n",
                         con_name, strerror(err));
@@ -101,6 +104,8 @@ runprogram(char *progname)
  //               kprintf("initializing stdout\n");
                 curproc->file_table[1] = kmalloc(sizeof(struct fh));
                 curproc->file_table[1]->mode = O_WRONLY;
+                curproc->file_table[1]->fh_lock = lock_create("stdout lock");
+		curproc->file_table[1]->num_refs = 1;
                 err = vfs_open(con_name, O_WRONLY, 0, &(curproc->file_table[1]->fileobj));
         	if (err) {
                         kprintf("Could not open %s for stdout: %s\n",
@@ -114,6 +119,8 @@ runprogram(char *progname)
   //              kprintf("initializing stderr\n");
                 curproc->file_table[2] = kmalloc(sizeof(struct fh));
                 curproc->file_table[2]->mode = O_WRONLY;
+                curproc->file_table[2]->fh_lock = lock_create("stdout lock");
+		curproc->file_table[2]->num_refs = 1;
                 err = vfs_open(con_name, O_WRONLY, 0, &(curproc->file_table[2]->fileobj));
         	if (err) {
                         kprintf("Could not open %s for stderr\n",

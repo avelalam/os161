@@ -8,40 +8,43 @@
 #include <vnode.h>
 #include <proc.h>
 #include <synch.h>
-#include<vfs.h>
+#include <vfs.h>
 #include <kern/fcntl.h>
-#include<kern/seek.h>
+#include <kern/seek.h>
+#include <kern/stat.h>
 #define EOF (-1)
 
 int sys_write(int fd, const void *buf,int buflen){
 	if(fd<0 || fd>63){
 		return EBADF;
 	}
+	lock_acquire(curproc->file_table[fd]->fh_lock);
 	if((curproc)->file_table[fd]==NULL){
 		return EBADF;
 	}
 	struct uio uio_write;
+	struct iovec iov;
 	int len = (int) buflen, err=0;
-	char data[256];
-	err = copyin(buf, data, len);
-	if(err){
-		return err;
-	}
+	
+	iov.iov_ubase = (userptr_t)buf;
+	iov.iov_len = len;
+	
+	uio_write.uio_iov = &iov;
 	uio_write.uio_rw = UIO_WRITE;
 	uio_write.uio_space = proc_getas();
 	uio_write.uio_segflg = UIO_USERSPACE;
 	uio_write.uio_iovcnt = 1;
-	uio_write.uio_iov->iov_ubase = (userptr_t)buf;
-	uio_write.uio_iov->iov_len = len;
 	uio_write.uio_resid = len;
 	uio_write.uio_offset = curproc->file_table[fd]->offset;		
+	
 	//kprintf("writing\n");	
 	err = VOP_WRITE((curproc->file_table[fd]->fileobj), &uio_write);		
-        //kprintf("done writing\n");
+	//kprintf("done writing\n");
 	if(err){
 		return err;
         }
 	curproc->file_table[fd]->offset = uio_write.uio_offset;
+	lock_release(curproc->file_table[fd]->fh_lock);
        	return -(len-uio_write.uio_resid); 
 }
 
@@ -94,24 +97,21 @@ int sys_read(int fd, void* buf, int buflen){
 	}
 
 	struct uio uio_read;
+	struct iovec iov;
 	int len = (int) buflen, err=0;	
-	char data[256];
-	err = copyin(buf,data,len);
-	if(err){
-		return err;
-	}
+	
+	iov.iov_ubase = (userptr_t)buf;
+	iov.iov_len = buflen;
+
+	uio_read.uio_iov = &iov;
 	uio_read.uio_rw = UIO_READ;
 	uio_read.uio_space = proc_getas();
 	uio_read.uio_segflg = UIO_USERSPACE;
 	uio_read.uio_iovcnt = 1;
-   	uio_read.uio_iov->iov_ubase = (userptr_t)buf;
-	uio_read.uio_iov->iov_len = len;
 	uio_read.uio_resid = len;
 	uio_read.uio_offset = curproc->file_table[fd]->offset;
 
-	kprintf("reading\n");
 	err = VOP_READ((curproc->file_table[fd]->fileobj),&uio_read);
-	kprintf("read\n");
 	if(err){
 		return err;	
 	}
@@ -126,19 +126,22 @@ int sys_read(int fd, void* buf, int buflen){
 }
 
 int sys_close(int fd){
-	kprintf("closing\n");
 	if(fd>63 || fd <0){
 		return EBADF;
-	}	
+	}
+	if(curproc->file_table[fd] == NULL){
+		return EBADF;
+	}
+	lock_acquire(curproc->file_table[fd]->fh_lock);	
 	if((curproc->file_table[fd]->num_refs == 1)){
 		vfs_close(curproc->file_table[fd]->fileobj);
+		lock_release(curproc->file_table[fd]->fh_lock);
 		kfree(curproc->file_table[fd]);
 		curproc->file_table[fd] = NULL;	
 	}else{
 		curproc->file_table[fd]->num_refs--;
+		lock_release(curproc->file_table[fd]->fh_lock);
 	}
-	(void)fd;
-	kprintf("closed\n");
 	return 0;
 }
 
@@ -152,34 +155,52 @@ int sys_chdir(const void *pathname){
 	}
 	return 0;
 }
-off_t sys_lseek(int fd,int low_32,int high_32,int whence){
+off_t sys_lseek(int fd,int high_32,int low_32,const void *whence_ptr){
 
-  if(fd<0 || fd>63)return EBADF;
-  bool b=VOP_ISSEEKABLE(curproc->file_table[fd]->fileobj);
-  if(b==false)return ESPIPE;
-  if(whence!=SEEK_SET || whence!=SEEK_CUR || whence!=SEEK_END)return EINVAL;
- 
-  long long pos=0;
-   pos=pos|high_32;
-   pos<<=32;
-   pos=pos|low_32; 
-  
-   if(whence==SEEK_SET){
-     curproc->file_table[fd]->offset=pos;
-  return -(curproc->file_table[fd]->offset);
-   } 
-  if(whence==SEEK_CUR){
-       curproc->file_table[fd]->offset+=pos;
-  return -(curproc->file_table[fd]->offset);
-  }
-  if(whence==SEEK_END){
-      curproc->file_table[fd]->offset=EOF+pos;
-  return -(curproc->file_table[fd]->offset);
-  }
- 
-  return EINVAL;
- return 0;
- 
+ 	if(fd<0 || fd>63){
+		return EBADF;
+	}
+	if(curproc->file_table[fd] == NULL){
+		return EBADF;
+	}
+	int whence,err;
+	err = copyin((userptr_t)whence_ptr, &whence, sizeof(int));
+	if(err){
+		return err;
+	}
+	bool b;	
+	b = VOP_ISSEEKABLE(curproc->file_table[fd]->fileobj);
+	if(b == false){
+		return ESPIPE;
+	}
+	struct stat file_stat;
+	
+	err = VOP_STAT(curproc->file_table[fd]->fileobj, &file_stat);
+	if(err){
+		return err;
+	}
+	off_t cursize = file_stat.st_size;
+	
+	off_t pos=0;
+	pos=pos|high_32;
+	pos<<=32;
+	pos=pos|low_32;
+	if(whence==SEEK_SET){
+		curproc->file_table[fd]->offset=pos;
+		return -(curproc->file_table[fd]->offset);
+	} 
+	
+	if(whence==SEEK_CUR){
+		curproc->file_table[fd]->offset+=pos;
+		return -(curproc->file_table[fd]->offset);
+	}
+
+	if(whence==SEEK_END){
+		curproc->file_table[fd]->offset=cursize+pos;
+		return -(curproc->file_table[fd]->offset);
+	}
+	return EINVAL;
+	return 0; 
 }
 
 int sys_dup2(int oldfd,int newfd){
