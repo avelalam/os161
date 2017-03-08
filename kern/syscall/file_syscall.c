@@ -12,16 +12,19 @@
 #include <kern/fcntl.h>
 #include <kern/seek.h>
 #include <kern/stat.h>
+#include <mips/trapframe.h>
+#include <addrspace.h>
 #define EOF (-1)
 
 int sys_write(int fd, const void *buf,int buflen){
 	if(fd<0 || fd>63){
 		return EBADF;
 	}
-	lock_acquire(curproc->file_table[fd]->fh_lock);
 	if((curproc)->file_table[fd]==NULL){
 		return EBADF;
 	}
+	lock_acquire(curproc->file_table[fd]->fh_lock);
+	
 	struct uio uio_write;
 	struct iovec iov;
 	int len = (int) buflen, err=0;
@@ -41,6 +44,7 @@ int sys_write(int fd, const void *buf,int buflen){
 	err = VOP_WRITE((curproc->file_table[fd]->fileobj), &uio_write);		
 	//kprintf("done writing\n");
 	if(err){
+		lock_release(curproc->file_table[fd]->fh_lock);
 		return err;
         }
 	curproc->file_table[fd]->offset = uio_write.uio_offset;
@@ -96,6 +100,7 @@ int sys_read(int fd, void* buf, int buflen){
 		return EBADF;
 	}
 
+	lock_acquire(curproc->file_table[fd]->fh_lock);
 	struct uio uio_read;
 	struct iovec iov;
 	int len = (int) buflen, err=0;	
@@ -113,16 +118,13 @@ int sys_read(int fd, void* buf, int buflen){
 
 	err = VOP_READ((curproc->file_table[fd]->fileobj),&uio_read);
 	if(err){
+		lock_release(curproc->file_table[fd]->fh_lock);
 		return err;	
 	}
 	
 	curproc->file_table[fd]->offset = uio_read.uio_offset;
+	lock_release(curproc->file_table[fd]->fh_lock);
        	return -(len-uio_read.uio_resid); 
-
-	(void)fd;
-	(void)buf;
-	(void)buflen;
-	return 0;
 }
 
 int sys_close(int fd){
@@ -233,12 +235,28 @@ int sys_getcwd(char *buf,size_t buflen){
            return err;
      }
    
-    return -(buflen-uio_getcwd.uio_resid);
-   
- 
+    return -(buflen-uio_getcwd.uio_resid); 
 }
 
 
-
-
-
+int sys_fork(struct proc *child){
+	
+	struct proc *newproc;
+	newproc = proc_wrapper(curproc->p_name);
+	if(newproc == NULL){
+		return ENOMEM;
+	}
+	newproc->p_addrspace = proc_getas();
+	for(int i=0; i<64; i++){
+		if(curproc->file_table[i] == NULL){
+			newproc->file_table[i] = NULL;
+		}else{
+			curproc->file_table[i]->num_refs++;
+			newproc->file_table[i] = curproc->file_table[i];
+		}
+	}	
+	child = newproc;
+	curproc->next_pid++;
+	return -curproc->next_pid;
+	(void)child;
+}

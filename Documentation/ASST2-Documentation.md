@@ -397,3 +397,17 @@ Abhilash:
 	lseek
 	dup2
 	__getcwd
+	
+	
+forktest:dependencies - waitpid getpid exit fork
+
+
+fork(){
+
+	create a new process
+	copy the file table to new process
+	increase number of references for each of opened file handles
+	stack?
+	how do we return to both the processes?
+
+}

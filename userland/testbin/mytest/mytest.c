@@ -44,10 +44,6 @@
 #include <err.h>
 #include <test161/test161.h>
 
-#define FILENAME "readwritetest.dat"
-
-static const char *MAGIC = "h4xa0rRq0Vgbc96tiYJ^!#nXzZSAKPO";
-
 int
 main(int argc, char **argv)
 {
@@ -57,15 +53,15 @@ main(int argc, char **argv)
 	(void) argc;
 	(void) argv;
 
-	int fd, ret;
-	fd = open("myfile.dat", O_RDONLY | O_CREAT);
-	
-	ret = write(fd, "i wrote here", 12);
-	if(ret){
-		printf("err ret:%d\n",ret);
+	int pid;
+	pid = fork();
+	while(pid<2);
+	if(pid != 0){
+		printf("parent\n");
+		printf("pid:1\n");
 	}else{
-		printf("ret:%d\n",ret);
+		printf("pid:0\n");
+		printf("child\n");
 	}
-	secprintf(SECRET, MAGIC, "/testbin/mytest");
 	return 0;
 }

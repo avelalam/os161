@@ -84,6 +84,9 @@ struct proc {
 
 	struct fh *file_table[64];
         int next_fd;
+	
+	int mypid;
+	int next_pid;
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */
@@ -110,5 +113,5 @@ struct addrspace *proc_getas(void);
 /* Change the address space of the current process, and return the old one. */
 struct addrspace *proc_setas(struct addrspace *);
 
-
+struct proc *proc_wrapper(char *name);
 #endif /* _PROC_H_ */

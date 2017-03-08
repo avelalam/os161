@@ -337,3 +337,11 @@ proc_setas(struct addrspace *newas)
 	spinlock_release(&proc->p_lock);
 	return oldas;
 }
+
+struct proc *
+proc_wrapper(char* name){
+
+	struct proc* newproc;
+	newproc = proc_create_runprogram(name);
+	return newproc;
+}

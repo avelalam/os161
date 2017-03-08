@@ -39,6 +39,7 @@
 #include <vm.h>
 #include <mainbus.h>
 #include <syscall.h>
+#include <addrspace.h>
 
 
 /* in exception-*.S */
