@@ -85,9 +85,23 @@ struct proc {
 	struct fh *file_table[64];
         int next_fd;
 	
-	int mypid;
-	int next_pid;
+	pid_t pid;
+	pid_t ppid;
+	
+	bool exit_status;
+	int exitcode;	
 };
+
+struct proc_table_struct{
+
+pid_t next_pid;
+struct proc *proc_table[32];
+
+};
+
+struct proc_table_struct *process_table;
+
+void init_proc_struct(void);
 
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;

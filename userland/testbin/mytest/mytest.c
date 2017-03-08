@@ -55,7 +55,7 @@ main(int argc, char **argv)
 
 	int pid;
 	pid = fork();
-	while(pid<2);
+	while(pid!=0);
 	if(pid != 0){
 		printf("parent\n");
 		printf("pid:1\n");

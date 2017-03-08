@@ -342,6 +342,16 @@ struct proc *
 proc_wrapper(char* name){
 
 	struct proc* newproc;
-	newproc = proc_create_runprogram(name);
+	newproc = proc_create(name);
 	return newproc;
+}
+
+void init_proc_struct(){
+	
+	process_table = kmalloc(sizeof(struct proc_table_struct));
+
+	process_table->proc_table[2] = curproc;
+	curproc->pid = 2;
+	process_table->next_pid=3;	 
+	
 }

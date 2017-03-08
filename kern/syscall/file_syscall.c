@@ -12,6 +12,7 @@
 #include <kern/fcntl.h>
 #include <kern/seek.h>
 #include <kern/stat.h>
+#include <kern/wait.h>
 #include <mips/trapframe.h>
 #include <addrspace.h>
 #define EOF (-1)
@@ -240,13 +241,18 @@ int sys_getcwd(char *buf,size_t buflen){
 
 
 int sys_fork(struct proc *child){
-	
+
 	struct proc *newproc;
-	newproc = proc_wrapper(curproc->p_name);
+	newproc = proc_create_runprogram("child");
 	if(newproc == NULL){
 		return ENOMEM;
 	}
-	newproc->p_addrspace = proc_getas();
+
+	int err = as_copy(curproc->p_addrspace, &newproc->p_addrspace);
+	if(err){
+		return err;
+	}	
+	newproc->next_fd = curproc->next_fd;
 	for(int i=0; i<64; i++){
 		if(curproc->file_table[i] == NULL){
 			newproc->file_table[i] = NULL;
@@ -254,9 +260,28 @@ int sys_fork(struct proc *child){
 			curproc->file_table[i]->num_refs++;
 			newproc->file_table[i] = curproc->file_table[i];
 		}
-	}	
+	}
+	
+	newproc->pid = process_table->next_pid++;
+	newproc->ppid = curproc->pid;
+	newproc->exit_status = false;
+	process_table->proc_table[newproc->pid] = child;	
+	
 	child = newproc;
-	curproc->next_pid++;
-	return -curproc->next_pid;
-	(void)child;
+	
+	return -(child->pid);
+}
+
+int sys_getpid(){
+
+	return -(curproc->pid);
+}
+
+void sys__exit(int exitcode){
+
+	int code = _MKWAIT_EXIT(exitcode);
+	process_table->proc_table[curproc->pid]->exit_status = true;
+	process_table->proc_table[curproc->pid]->exitcode = code;
+	thread_exit();
+
 }

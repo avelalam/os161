@@ -80,7 +80,8 @@ runprogram(char *progname)
 	proc_setas(as);
 	as_activate();
 	
-
+	init_proc_struct();
+	
 	char *con_name = kstrdup("con:");
         if(curproc->file_table[0]==NULL){
 //                kprintf("initializing stdin\n");

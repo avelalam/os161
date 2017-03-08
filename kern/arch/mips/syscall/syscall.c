@@ -156,9 +156,6 @@ syscall(struct trapframe *tf)
 		err = sys_chdir((char *)tf->tf_a0);
 		break;
 
-	    case SYS__exit:
-		err=0;
-		break;
 	    case SYS_lseek:
                 offset = sys_lseek((int)tf->tf_a0,(int)tf->tf_a2,(int)tf->tf_a3,(int*)(tf->tf_sp+16));
 		if(offset<=0){
@@ -188,6 +185,18 @@ syscall(struct trapframe *tf)
 		}
 		break;
 
+	   case SYS_getpid:
+		err = sys_getpid();
+		if(err<=0){
+			retval = -err;
+			err=0;
+		}
+		break;
+
+	   case SYS__exit:
+		sys__exit((int)tf->tf_a0);
+		err=0;
+		break;
 	   /* Add stuff here */
 
 	    default:
@@ -238,13 +247,13 @@ syscall(struct trapframe *tf)
 void
 enter_forked_process(struct trapframe *tf)
 {	
-	as_activate();
-	struct trapframe *child_tf;
-	child_tf = kmalloc(sizeof(struct trapframe));
-	*child_tf = *tf;
-	child_tf->tf_epc += 4;
-	child_tf->tf_v0 = 0;
+	struct trapframe child_tf;
+	child_tf = *tf;
+//	memcpy(child_tf, tf, sizeof(struct trapframe));
+	child_tf.tf_epc += 4;
+	child_tf.tf_v0 = 0;
+	child_tf.tf_a3 = 0;
 	
-	mips_usermode(child_tf);
+	mips_usermode(&child_tf);
 	panic("mips_usermode doesnt return");
 }

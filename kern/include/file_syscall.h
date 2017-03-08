@@ -9,3 +9,5 @@ off_t sys_lseek(int fd,int low_32,int high_32,const void *whence);
 int sys_dup2(int oldfd,int newfd);
 int sys_getcwd(char *buf,size_t buflen);
 int sys_fork(struct proc *child);
+int sys_getpid(void);
+void sys__exit(int exitcode);
