@@ -85,18 +85,23 @@ struct proc {
 	struct fh *file_table[64];
         int next_fd;
 	
+	int mypid;
+	int next_pid;
+
 	pid_t pid;
 	pid_t ppid;
 	
 	bool exit_status;
 	int exitcode;	
+
+	struct semaphore *proc_sem;
 };
 
 struct proc_table_struct{
 
 pid_t next_pid;
 struct proc *proc_table[32];
-
+struct lock *pt_lock;
 };
 
 struct proc_table_struct *process_table;

@@ -15,6 +15,7 @@
 #include <kern/wait.h>
 #include <mips/trapframe.h>
 #include <addrspace.h>
+#include <syscall.h>
 #define EOF (-1)
 
 int sys_write(int fd, const void *buf,int buflen){
@@ -172,6 +173,7 @@ off_t sys_lseek(int fd,int high_32,int low_32,const void *whence_ptr){
 		return err;
 	}
 	bool b;	
+	lock_acquire(curproc->file_table[fd]->fh_lock);	
 	b = VOP_ISSEEKABLE(curproc->file_table[fd]->fileobj);
 	if(b == false){
 		return ESPIPE;
@@ -190,33 +192,37 @@ off_t sys_lseek(int fd,int high_32,int low_32,const void *whence_ptr){
 	pos=pos|low_32;
 	if(whence==SEEK_SET){
 		curproc->file_table[fd]->offset=pos;
+		lock_release(curproc->file_table[fd]->fh_lock);
 		return -(curproc->file_table[fd]->offset);
 	} 
 	
 	if(whence==SEEK_CUR){
 		curproc->file_table[fd]->offset+=pos;
+		lock_release(curproc->file_table[fd]->fh_lock);
 		return -(curproc->file_table[fd]->offset);
 	}
 
 	if(whence==SEEK_END){
 		curproc->file_table[fd]->offset=cursize+pos;
+		lock_release(curproc->file_table[fd]->fh_lock);
 		return -(curproc->file_table[fd]->offset);
 	}
+
+	lock_release(curproc->file_table[fd]->fh_lock);
 	return EINVAL;
 	return 0; 
 }
 
 int sys_dup2(int oldfd,int newfd){
 
- if(oldfd<0   || oldfd>63 || newfd<0 || newfd>63)return EBADF;
+	if(oldfd<0   || oldfd>63 || newfd<0 || newfd>63)return EBADF;
 
-  
-   if(curproc->file_table[newfd]->fileobj!=NULL){
-        vfs_close(curproc->file_table[newfd]->fileobj);
-    }
-    curproc->file_table[newfd]=curproc->file_table[oldfd];
-
-    return -(newfd);
+	if(curproc->file_table[newfd]->fileobj!=NULL){
+	 	vfs_close(curproc->file_table[newfd]->fileobj);
+	}
+	curproc->file_table[newfd]=curproc->file_table[oldfd];
+	
+	return -(newfd);
 
 }
 
@@ -240,9 +246,17 @@ int sys_getcwd(char *buf,size_t buflen){
 }
 
 
-int sys_fork(struct proc *child){
+int sys_fork(struct trapframe *tf){
 
 	struct proc *newproc;
+	struct trapframe *child_tf;
+	
+	child_tf = kmalloc(sizeof(struct trapframe));
+	if(child_tf == NULL){
+		return ENOMEM;
+	}
+	*child_tf = *tf;
+	
 	newproc = proc_create_runprogram("child");
 	if(newproc == NULL){
 		return ENOMEM;
@@ -252,36 +266,76 @@ int sys_fork(struct proc *child){
 	if(err){
 		return err;
 	}	
+	
 	newproc->next_fd = curproc->next_fd;
 	for(int i=0; i<64; i++){
 		if(curproc->file_table[i] == NULL){
 			newproc->file_table[i] = NULL;
-		}else{
+		}else{	
+			lock_acquire(curproc->file_table[i]->fh_lock);	
 			curproc->file_table[i]->num_refs++;
 			newproc->file_table[i] = curproc->file_table[i];
+			lock_release(curproc->file_table[i]->fh_lock);
 		}
 	}
-	
-	newproc->pid = process_table->next_pid++;
 	newproc->ppid = curproc->pid;
 	newproc->exit_status = false;
-	process_table->proc_table[newproc->pid] = child;	
-	
-	child = newproc;
-	
-	return -(child->pid);
+	newproc->proc_sem = sem_create("procsec",0);
+
+	lock_acquire(process_table->pt_lock);	
+	newproc->pid = process_table->next_pid++;
+	process_table->proc_table[newproc->pid] = newproc;	
+	lock_release(process_table->pt_lock);	
+
+	err = thread_fork("childthread", newproc, enter_forked_process, (void*)child_tf, 0);
+	if(err){
+		return err;
+	}
+
+	return -(newproc->pid);
 }
 
 int sys_getpid(){
-
 	return -(curproc->pid);
 }
 
 void sys__exit(int exitcode){
 
 	int code = _MKWAIT_EXIT(exitcode);
+	
+	lock_acquire(process_table->pt_lock);
 	process_table->proc_table[curproc->pid]->exit_status = true;
 	process_table->proc_table[curproc->pid]->exitcode = code;
+	lock_release(process_table->pt_lock);
+	
+	V(curproc->proc_sem);
 	thread_exit();
 
+}
+
+int sys_waitpid(int pid, void* status, int options){
+	if(options != 0){
+		return EINVAL;
+	}
+	if(pid < 3 || pid > 32){
+		return ECHILD;
+	}
+	struct proc *child_proc;
+	int err;
+	child_proc = process_table->proc_table[pid];
+	if(child_proc==NULL){
+		return ESRCH;
+	}
+	P(child_proc->proc_sem);
+	if(status != NULL){
+		err = copyout(&child_proc->exitcode, (userptr_t) status, sizeof(int ));
+		if(err){
+			proc_destroy(child_proc);
+			process_table->proc_table[pid] = NULL;
+			return err;
+		}
+	}	
+	proc_destroy(child_proc);
+	process_table->proc_table[pid] = NULL;
+	return -pid;
 }

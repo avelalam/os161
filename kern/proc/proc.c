@@ -50,6 +50,7 @@
 #include <vnode.h>
 #include <kern/fcntl.h>
 #include <vfs.h>
+#include <synch.h>
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
@@ -350,8 +351,11 @@ void init_proc_struct(){
 	
 	process_table = kmalloc(sizeof(struct proc_table_struct));
 
-	process_table->proc_table[2] = curproc;
-	curproc->pid = 2;
 	process_table->next_pid=3;	 
-	
+	process_table->proc_table[2] = curproc;
+	process_table->pt_lock = lock_create("pt_lock");
+
+	curproc->pid = 2;
+	curproc->proc_sem = sem_create("init_process",0);
+		
 }

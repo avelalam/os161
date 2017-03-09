@@ -76,13 +76,6 @@
  * stack, starting at sp+16 to skip over the slots for the
  * registerized values, with copyin().
  */
-static                                                                                               
-void forker(void *tf, long unsigned int i){                                                          
-
-	enter_forked_process((struct trapframe*)tf);
-	panic("shold not return from enter_forked_process\n");
-	(void)i;
-}
 
 void
 syscall(struct trapframe *tf)
@@ -92,7 +85,6 @@ syscall(struct trapframe *tf)
 	int32_t low32_retval;
 	int err;
 	off_t offset;
-	struct proc *child;
 
 	KASSERT(curthread != NULL);
 	KASSERT(curthread->t_curspl == 0);
@@ -111,7 +103,6 @@ syscall(struct trapframe *tf)
 
 	retval = 0;
 	low32_retval = 0;
-	child = NULL;
 	switch (callno) {
 	    case SYS_reboot:
 		err = sys_reboot(tf->tf_a0);
@@ -168,7 +159,7 @@ syscall(struct trapframe *tf)
 			err = offset;
 		}
                 break;
-           case SYS_dup2:
+            case SYS_dup2:
                 err=sys_dup2((int)tf->tf_a0,(int)tf->tf_a1);
                 if(err<=0){
                          retval= -err;
@@ -176,16 +167,15 @@ syscall(struct trapframe *tf)
                    }
                 break;
 
-	   case SYS_fork:
-		err = sys_fork(child);
+	    case SYS_fork:
+		err = sys_fork(tf);
 		if(err<=0){
 			retval = -err;
 			err = 0;
-			thread_fork("child process", child, forker, tf, 0);
 		}
 		break;
 
-	   case SYS_getpid:
+	    case SYS_getpid:
 		err = sys_getpid();
 		if(err<=0){
 			retval = -err;
@@ -193,9 +183,19 @@ syscall(struct trapframe *tf)
 		}
 		break;
 
-	   case SYS__exit:
+	    case SYS_waitpid:
+		err = sys_waitpid((int) tf->tf_a0,
+				  (void*) tf->tf_a1,
+				  (int) tf->tf_a2);
+		if(err<=0){
+			retval = -err;
+			err = 0;
+		}
+		break;
+
+	    case SYS__exit:
 		sys__exit((int)tf->tf_a0);
-		err=0;
+		err = 0;
 		break;
 	   /* Add stuff here */
 
@@ -245,15 +245,15 @@ syscall(struct trapframe *tf)
  */
 
 void
-enter_forked_process(struct trapframe *tf)
+enter_forked_process(void *tf,unsigned long int i)
 {	
 	struct trapframe child_tf;
-	child_tf = *tf;
-//	memcpy(child_tf, tf, sizeof(struct trapframe));
+	child_tf = *(struct trapframe*)tf;	
+	(void)i;	
 	child_tf.tf_epc += 4;
 	child_tf.tf_v0 = 0;
 	child_tf.tf_a3 = 0;
-	
+
 	mips_usermode(&child_tf);
 	panic("mips_usermode doesnt return");
 }

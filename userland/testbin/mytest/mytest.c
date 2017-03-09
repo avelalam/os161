@@ -53,15 +53,19 @@ main(int argc, char **argv)
 	(void) argc;
 	(void) argv;
 
-	int pid;
+	int pid,mypid, status;
 	pid = fork();
-	while(pid!=0);
-	if(pid != 0){
+	if(pid==3){
+		waitpid(pid, &status, 0);
 		printf("parent\n");
-		printf("pid:1\n");
+		printf("pid:%d\n",pid);
+		mypid = getpid();
+		printf("mypid:%d\n",mypid);
 	}else{
-		printf("pid:0\n");
 		printf("child\n");
+		printf("pid:%d\n",pid);
+		mypid = getpid();
+		printf("mypid:%d\n",mypid);
 	}
 	return 0;
 }
