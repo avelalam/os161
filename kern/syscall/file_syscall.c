@@ -339,3 +339,44 @@ int sys_waitpid(int pid, void* status, int options){
 	process_table->proc_table[pid] = NULL;
 	return -pid;
 }
+
+int sys_execv(char *prog_name,char **args){
+	
+	int err, argc=0;
+	struct vnode *v;
+	struct addrspace *as;
+	vaddr_t entrypoint, stackptr;		
+
+	err = vfs_open(prog_name, O_RDONLY, 0, &v);
+	if(err){
+		return err;
+	}
+
+	as = as_create();
+	if(as == NULL){
+		vfs_close(v);
+		return ENOMEM;
+	}
+
+	proc_setas(as);
+	as_activate();
+		
+	err = load_elf(v, &entrypoint);
+	if(err){
+		vfs_close(v);
+		return err;
+	}
+	vfs_close(v);
+
+	err = as_define_stack(as, &stackptr);
+	if(err){
+		return err;
+	}
+
+	enter_new_process(argc, NULL, NULL, stackptr, entrypoint);
+//	panic("should not return here\n");
+	(void)prog_name;
+	(void)args;
+	
+	return 0;
+}

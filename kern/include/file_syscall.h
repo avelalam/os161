@@ -13,3 +13,4 @@ int sys_fork(struct trapframe *tf);
 int sys_getpid(void);
 int sys_waitpid(int pid, void* status, int options);
 void sys__exit(int exitcode);
+int sys_execv(char *prog_name, char **args);
