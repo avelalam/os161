@@ -51,6 +51,7 @@
 #include <kern/fcntl.h>
 #include <vfs.h>
 #include <synch.h>
+#include <file_syscall.h>
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
@@ -357,5 +358,8 @@ void init_proc_struct(){
 
 	curproc->pid = 2;
 	curproc->proc_sem = sem_create("init_process",0);
-		
+
+	buffer = kmalloc(sizeof(struct args_buffer));
+	buffer->curindex = 0;
+	buffer->buffer_lock = lock_create("buff_lock");
 }

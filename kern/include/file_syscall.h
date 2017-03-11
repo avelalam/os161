@@ -1,5 +1,7 @@
 #include <proc.h>
 #include <mips/trapframe.h>
+#include <limits.h>
+#include <synch.h>
 
 int sys_write(int fd,const void*  buf, int buflen);
 int sys_open(char *filename,int flags);
@@ -14,3 +16,12 @@ int sys_getpid(void);
 int sys_waitpid(int pid, void* status, int options);
 void sys__exit(int exitcode);
 int sys_execv(char *prog_name, char **args);
+
+struct args_buffer{
+
+	char buffer[ARG_MAX];
+	int curindex;
+	struct lock *buffer_lock;
+};
+
+struct args_buffer *buffer;

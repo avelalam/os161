@@ -16,6 +16,7 @@
 #include <mips/trapframe.h>
 #include <addrspace.h>
 #include <syscall.h>
+#include <limits.h>
 #define EOF (-1)
 
 int sys_write(int fd, const void *buf,int buflen){
@@ -344,21 +345,51 @@ int sys_execv(char *prog_name,char **args){
 	
 	int err, argc=0;
 	struct vnode *v;
-	struct addrspace *as;
 	vaddr_t entrypoint, stackptr;		
+	char *name;
+	char **inargs;
+	size_t len, str_len;
+	name = kmalloc(strlen(prog_name));
+	err = copyinstr((const_userptr_t)prog_name, name, PATH_MAX, &len);
+	if(err){
+		return err;
+	}
+	args++;
+	argc++;
+	kprintf("here\n");
+
+	int index = buffer->curindex;
+	while(1){
+	
+		inargs = kmalloc(sizeof(char**));
+		err = copyin((const_userptr_t)args, inargs, sizeof(int));	
+		if(err){
+			return err;
+		}	
+		if(*inargs == NULL){
+			kfree(inargs);
+			break;
+		}
+		str_len = strlen(*inargs);
+		
+		err = copyin((const_userptr_t)(*args), &buffer->buffer[buffer->curindex], str_len);
+		if(err){
+			return err;
+		}
+		buffer->curindex += str_len;
+		buffer->buffer[buffer->curindex++] = '';
+		kprintf("buf:%s\n", buffer->buffer);
+		kfree(inargs);
+		args++;
+	}
 
 	err = vfs_open(prog_name, O_RDONLY, 0, &v);
 	if(err){
 		return err;
 	}
 
-	as = as_create();
-	if(as == NULL){
-		vfs_close(v);
-		return ENOMEM;
-	}
-
-	proc_setas(as);
+	curproc->p_addrspace = as_create();
+	proc_setas(curproc->p_addrspace);
 	as_activate();
 		
 	err = load_elf(v, &entrypoint);
@@ -368,13 +399,14 @@ int sys_execv(char *prog_name,char **args){
 	}
 	vfs_close(v);
 
-	err = as_define_stack(as, &stackptr);
+	err = as_define_stack(curproc->p_addrspace, &stackptr);
 	if(err){
 		return err;
 	}
-
-	enter_new_process(argc, NULL, NULL, stackptr, entrypoint);
+	
+	enter_new_process(argc, (userptr_t)args, NULL, stackptr, entrypoint);
 //	panic("should not return here\n");
+	(void)inargs;
 	(void)prog_name;
 	(void)args;
 	
