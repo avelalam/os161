@@ -162,7 +162,7 @@ int sys_chdir(const void *pathname){
 }
 off_t sys_lseek(int fd,int high_32,int low_32,const void *whence_ptr){
 
- 	if(fd<0 || fd>63){
+ 	if(fd<3 || fd>63){
 		return EBADF;
 	}
 	if(curproc->file_table[fd] == NULL){
@@ -217,11 +217,14 @@ off_t sys_lseek(int fd,int high_32,int low_32,const void *whence_ptr){
 int sys_dup2(int oldfd,int newfd){
 
 	if(oldfd<0   || oldfd>63 || newfd<0 || newfd>63)return EBADF;
-
+	
+	
 	if(curproc->file_table[newfd]->fileobj!=NULL){
-	 	vfs_close(curproc->file_table[newfd]->fileobj);
+	 	lock_acquire(curproc->file_table[newfd]->fh_lock);
+		vfs_close(curproc->file_table[newfd]->fileobj);
+		lock_release(curproc->file_table[newfd]->fh_lock);
+		curproc->file_table[newfd]=curproc->file_table[oldfd];
 	}
-	curproc->file_table[newfd]=curproc->file_table[oldfd];
 	
 	return -(newfd);
 
@@ -342,7 +345,7 @@ int sys_waitpid(int pid, void* status, int options){
 }
 
 int sys_execv(char *prog_name,char **args){
-	
+
 	int err, argc=0;
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;		
@@ -354,8 +357,7 @@ int sys_execv(char *prog_name,char **args){
 	if(err){
 		return err;
 	}
-
-	int index = buffer->curindex;	
+	int index=0;
 	while(1){
 	
 		inargs = kmalloc(sizeof(char**));
@@ -369,42 +371,52 @@ int sys_execv(char *prog_name,char **args){
 		}
 		
 		//storing argument length
-		str_len = strlen(*inargs);
+	/*	str_len = strlen(*inargs);
 		while(str_len != 0){
-			buffer->curindex++;
+			//ibuffer->curindex++;
+			index++;
 			str_len /= 10;
 		}
 		str_len = strlen(*inargs);
 		int i=1;
 		while(str_len != 0){
 			int digit = str_len%10;	
-			buffer->buffer[buffer->curindex-(i++)] = digit + '0';
+			//buffer->buffer[buffer->curindex-(i++)] = digit + '0';
+			buffer1[index-(i++)] = digit + '0';
 			str_len /= 10;							
 		}
-		buffer->buffer[buffer->curindex] = '#';
-		
-		err = copyin((const_userptr_t)(*args), &buffer->buffer[++buffer->curindex], strlen(*inargs));
+		//buffer->buffer[buffer->curindex] = '#';
+		buffer1[index] = '#';
+	*/	//err = copyin((const_userptr_t)(*args), &buffer->buffer[++buffer->curindex], strlen(*inargs));
+		size_t len = 0;
+		err = copyinstr((const_userptr_t)(*args), &buffer1[index],ARG_MAX-index, &len);
 		if(err){
 			return err;
 		}
-		buffer->curindex += strlen(*inargs);
-		buffer->buffer[buffer->curindex++] = '\0';
+		//buffer->curindex += strlen(*inargs);
+		index += len-1;
+		//buffer->buffer[buffer->curindex++] = '\0';
+		buffer1[index++] = '\0';
 		kfree(inargs);
 		args++;
 		argc++;
 	}
-	
 	//array of pointers to each argument 
-	int j = index;
+	int j = 0;
 	char *argptr[argc+1];
 	for(int i = 0;i<argc ;i++){
-		int temp = 0;
-		while(buffer->buffer[j] != '#'){
-			temp = temp*10 + buffer->buffer[j++] - '0';
+	//	while(buffer->buffer[j] != '#'){
+			//temp = temp*10 + buffer->buffer[j++] - '0';
+	/*	while(buffer1[j] != '#'){
+			temp = temp*10 + buffer1[j++] - '0';
 		}
 		j++;
-		argptr[i] = &buffer->buffer[j];
-		j += temp+1;
+	*/	//argptr[i] = &buffer->buffer[j];
+		argptr[i] = &buffer1[j++];
+		while(buffer1[j]!='\0'){
+			j++;
+		}
+		j++;
 	}
 
 	int strspace = 0;
@@ -471,7 +483,7 @@ int sys_execv(char *prog_name,char **args){
 		}
 			
 	}
-	
+	memset(buffer1, '\0', sizeof(buffer1));
 	enter_new_process(argc, (userptr_t)stackptr, NULL, stackptr, entrypoint);
 	panic("should not return here\n");
 	(void)inargs;

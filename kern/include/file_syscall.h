@@ -17,11 +17,12 @@ int sys_waitpid(int pid, void* status, int options);
 void sys__exit(int exitcode);
 int sys_execv(char *prog_name, char **args);
 
-struct args_buffer{
+//struct args_buffer{
+//
+//	char buffer[ARG_MAX];
+//	int curindex;
+//	struct lock *buffer_lock;
+//};
 
-	char buffer[ARG_MAX];
-	int curindex;
-	struct lock *buffer_lock;
-};
-
-struct args_buffer *buffer;
+char buffer1[ARG_MAX];
+//struct args_buffer *buffer;
