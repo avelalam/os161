@@ -354,11 +354,8 @@ int sys_execv(char *prog_name,char **args){
 	if(err){
 		return err;
 	}
-	args++;
-	argc++;
-	kprintf("here\n");
 
-	int index = buffer->curindex;
+	int index = buffer->curindex;	
 	while(1){
 	
 		inargs = kmalloc(sizeof(char**));
@@ -370,17 +367,49 @@ int sys_execv(char *prog_name,char **args){
 			kfree(inargs);
 			break;
 		}
-		str_len = strlen(*inargs);
 		
-		err = copyin((const_userptr_t)(*args), &buffer->buffer[buffer->curindex], str_len);
+		//storing argument length
+		str_len = strlen(*inargs);
+		while(str_len != 0){
+			buffer->curindex++;
+			str_len /= 10;
+		}
+		str_len = strlen(*inargs);
+		int i=1;
+		while(str_len != 0){
+			int digit = str_len%10;	
+			buffer->buffer[buffer->curindex-(i++)] = digit + '0';
+			str_len /= 10;							
+		}
+		buffer->buffer[buffer->curindex] = '#';
+		
+		err = copyin((const_userptr_t)(*args), &buffer->buffer[++buffer->curindex], strlen(*inargs));
 		if(err){
 			return err;
 		}
-		buffer->curindex += str_len;
-		buffer->buffer[buffer->curindex++] = '';
-		kprintf("buf:%s\n", buffer->buffer);
+		buffer->curindex += strlen(*inargs);
+		buffer->buffer[buffer->curindex++] = '\0';
 		kfree(inargs);
 		args++;
+		argc++;
+	}
+	
+	//array of pointers to each argument 
+	int j = index;
+	char *argptr[argc+1];
+	for(int i = 0;i<argc ;i++){
+		int temp = 0;
+		while(buffer->buffer[j] != '#'){
+			temp = temp*10 + buffer->buffer[j++] - '0';
+		}
+		j++;
+		argptr[i] = &buffer->buffer[j];
+		j += temp+1;
+	}
+
+	int strspace = 0;
+	for(int i = 0; i<argc; i++){
+		strspace += 1 + strlen(argptr[i])/4;
 	}
 
 	err = vfs_open(prog_name, O_RDONLY, 0, &v);
@@ -399,13 +428,52 @@ int sys_execv(char *prog_name,char **args){
 	}
 	vfs_close(v);
 
+	
 	err = as_define_stack(curproc->p_addrspace, &stackptr);
 	if(err){
 		return err;
 	}
 	
-	enter_new_process(argc, (userptr_t)args, NULL, stackptr, entrypoint);
-//	panic("should not return here\n");
+	stackptr -= strspace*4;
+	stackptr -= 4*(argc+1);
+
+	char *s_ptr = (char*)stackptr;
+
+	s_ptr += 4*(argc);
+	char *temp_ptr = s_ptr-4;
+	char **ptrptr = &(temp_ptr);
+	for(int i=0; i<4; i++){
+		*s_ptr = '\0';
+		s_ptr++;
+	}
+	
+	for(int i=argc-1; i>=0; i--){
+		
+		str_len = strlen(argptr[i]);
+		err = copyout(argptr[i], (userptr_t)s_ptr, str_len);
+		if(err){
+			return err;
+		}
+		//refering to actual argument
+		err = copyout(&s_ptr, (userptr_t)*ptrptr, sizeof(int));
+		if(err){
+			return err;
+		}
+		*ptrptr -= 4;
+		//padding nulls to the argument
+		s_ptr += str_len;
+		int nulls = 1+(str_len/4);
+		nulls *= 4;
+		nulls -= str_len;
+		while(nulls>0){
+			*s_ptr = '\0';
+			s_ptr++;nulls--;
+		}
+			
+	}
+	
+	enter_new_process(argc, (userptr_t)stackptr, NULL, stackptr, entrypoint);
+	panic("should not return here\n");
 	(void)inargs;
 	(void)prog_name;
 	(void)args;
