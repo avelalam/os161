@@ -100,7 +100,7 @@ struct proc {
 struct proc_table_struct{
 
 pid_t next_pid;
-struct proc *proc_table[32];
+struct proc *proc_table[132];
 struct lock *pt_lock;
 };
 

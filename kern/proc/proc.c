@@ -359,7 +359,4 @@ void init_proc_struct(){
 	curproc->pid = 2;
 	curproc->proc_sem = sem_create("init_process",0);
 
-	buffer = kmalloc(sizeof(struct args_buffer));
-	buffer->curindex = 0;
-	buffer->buffer_lock = lock_create("buff_lock");
 }
