@@ -292,7 +292,7 @@ int sys_fork(struct trapframe *tf){
 
 	struct proc *newproc;
 	struct trapframe *child_tf;
-	
+	int pid;
 	child_tf = kmalloc(sizeof(struct trapframe));
 	if(child_tf == NULL){
 		return ENOMEM;
@@ -325,7 +325,13 @@ int sys_fork(struct trapframe *tf){
 	newproc->proc_sem = sem_create("procsec",0);
 
 	lock_acquire(process_table->pt_lock);	
-	newproc->pid = process_table->next_pid++;
+	for(pid=3; pid<200; pid++){
+		if(process_table->proc_table[pid] == NULL){
+			break;
+		}
+	}
+//	newproc->pid = process_table->next_pid++;
+	newproc->pid = pid;
 	process_table->proc_table[newproc->pid] = newproc;	
 	lock_release(process_table->pt_lock);	
 
@@ -343,8 +349,8 @@ int sys_getpid(){
 
 void sys__exit(int exitcode){
 
-	int code = _MKWAIT_EXIT(exitcode);
-	
+	int code=0;
+	code = _MKWAIT_EXIT(exitcode);
 	lock_acquire(process_table->pt_lock);
 	process_table->proc_table[curproc->pid]->exit_status = true;
 	process_table->proc_table[curproc->pid]->exitcode = code;

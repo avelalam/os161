@@ -86,7 +86,7 @@ runprogram(char *progname)
         if(curproc->file_table[0]==NULL){
 //                kprintf("initializing stdin\n");
                 curproc->file_table[0] = kmalloc(sizeof(struct fh));
-		curproc->file_table[0]->mode = O_RDONLY;
+		curproc->file_table[0]->mode = O_RDONLY&O_ACCMODE;
                 curproc->file_table[0]->fh_lock = lock_create("stdin lock");
 		curproc->file_table[0]->num_refs = 1;
 		err = vfs_open(con_name, O_RDONLY, 0, &(curproc->file_table[0]->fileobj));
@@ -104,7 +104,7 @@ runprogram(char *progname)
         if(curproc->file_table[1]==NULL){
  //               kprintf("initializing stdout\n");
                 curproc->file_table[1] = kmalloc(sizeof(struct fh));
-                curproc->file_table[1]->mode = O_WRONLY;
+                curproc->file_table[1]->mode = O_WRONLY&O_ACCMODE;
                 curproc->file_table[1]->fh_lock = lock_create("stdout lock");
 		curproc->file_table[1]->num_refs = 1;
                 err = vfs_open(con_name, O_WRONLY, 0, &(curproc->file_table[1]->fileobj));
@@ -119,7 +119,7 @@ runprogram(char *progname)
         if(curproc->file_table[2]==NULL){
   //              kprintf("initializing stderr\n");
                 curproc->file_table[2] = kmalloc(sizeof(struct fh));
-                curproc->file_table[2]->mode = O_WRONLY;
+                curproc->file_table[2]->mode = O_WRONLY&O_ACCMODE;
                 curproc->file_table[2]->fh_lock = lock_create("stdout lock");
 		curproc->file_table[2]->num_refs = 1;
                 err = vfs_open(con_name, O_WRONLY, 0, &(curproc->file_table[2]->fileobj));
