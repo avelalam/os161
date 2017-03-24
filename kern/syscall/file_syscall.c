@@ -155,6 +155,7 @@ int sys_close(int fd){
 	if((curproc->file_table[fd]->num_refs == 1)){
 		vfs_close(curproc->file_table[fd]->fileobj);
 		lock_release(curproc->file_table[fd]->fh_lock);
+		kfree(curproc->file_table[fd]->fh_lock);
 		kfree(curproc->file_table[fd]);
 		curproc->file_table[fd] = NULL;	
 	}else{
@@ -324,22 +325,23 @@ int sys_fork(struct trapframe *tf){
 	newproc->exit_status = false;
 	newproc->proc_sem = sem_create("procsec",0);
 
-	lock_acquire(process_table->pt_lock);	
+	lock_acquire(pt_lock);	
 	for(pid=3; pid<200; pid++){
-		if(process_table->proc_table[pid] == NULL){
+		if(proc_table[pid] == NULL){
 			break;
 		}
 	}
-//	newproc->pid = process_table->next_pid++;
 	newproc->pid = pid;
-	process_table->proc_table[newproc->pid] = newproc;	
-	lock_release(process_table->pt_lock);	
+	proc_table[newproc->pid] = newproc;	
+	lock_release(pt_lock);	
 
 	err = thread_fork("childthread", newproc, enter_forked_process, (void*)child_tf, 0);
 	if(err){
 		return err;
 	}
 
+	P(newproc->proc_sem);
+	kfree(child_tf);	
 	return -(newproc->pid);
 }
 
@@ -351,12 +353,18 @@ void sys__exit(int exitcode){
 
 	int code=0;
 	code = _MKWAIT_EXIT(exitcode);
-	lock_acquire(process_table->pt_lock);
-	process_table->proc_table[curproc->pid]->exit_status = true;
-	process_table->proc_table[curproc->pid]->exitcode = code;
-	lock_release(process_table->pt_lock);
+	lock_acquire(pt_lock);
+	proc_table[curproc->pid]->exit_status = true;
+	proc_table[curproc->pid]->exitcode = code;
+	lock_release(pt_lock);
 	
 	V(curproc->proc_sem);
+	if(curproc->ppid == -1){
+		sem_destroy(curproc->proc_sem);
+		lock_destroy(pt_lock);
+		proc_destroy(curproc);
+	}
+
 	thread_exit();
 
 }
@@ -373,7 +381,7 @@ int sys_waitpid(int pid, void* status, int options){
 	}
 	struct proc *child_proc;
 	int err;
-	child_proc = process_table->proc_table[pid];
+	child_proc = proc_table[pid];
 	if(child_proc==NULL){
 		return ESRCH;
 	}
@@ -384,13 +392,25 @@ int sys_waitpid(int pid, void* status, int options){
 	if(status != NULL){
 		err = copyout(&child_proc->exitcode, (userptr_t) status, sizeof(int ));
 		if(err){
+			sem_destroy(child_proc->proc_sem);	
 			proc_destroy(child_proc);
-			process_table->proc_table[pid] = NULL;
+			proc_table[pid] = NULL;
 			return err;
 		}
-	}	
+	}
+
+	for(int i=3; i<64; i++){
+		if(child_proc->file_table[i] != NULL){
+			if(child_proc->file_table[i]->num_refs == 1){
+				kfree(child_proc->file_table[i]);
+			}else{
+				child_proc->file_table[i]->num_refs--;
+			}
+		}
+	}
+	sem_destroy(child_proc->proc_sem);	
 	proc_destroy(child_proc);
-	process_table->proc_table[pid] = NULL;
+	proc_table[pid] = NULL;
 	return -pid;
 }
 
@@ -415,6 +435,7 @@ int sys_execv(char *prog_name,char **args){
 		inargs = kmalloc(sizeof(char**));
 		err = copyin((const_userptr_t)args, inargs, sizeof(int));	
 		if(err){
+			kfree(inargs);
 			return err;
 		}	
 		if(*inargs == NULL){

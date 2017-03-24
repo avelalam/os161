@@ -350,11 +350,9 @@ proc_wrapper(char* name){
 
 void init_proc_struct(){
 	
-	process_table = kmalloc(sizeof(struct proc_table_struct));
 
-	process_table->next_pid=3;	 
-	process_table->proc_table[2] = curproc;
-	process_table->pt_lock = lock_create("pt_lock");
+	proc_table[2] = curproc;
+	pt_lock = lock_create("pt_lock");
 
 	curproc->pid = 2;
 	curproc->proc_sem = sem_create("init_process",0);

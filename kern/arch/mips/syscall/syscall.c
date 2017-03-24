@@ -258,6 +258,7 @@ enter_forked_process(void *tf,unsigned long int i)
 	child_tf.tf_v0 = 0;
 	child_tf.tf_a3 = 0;
 
+	V(curproc->proc_sem);
 	mips_usermode(&child_tf);
 	panic("mips_usermode doesnt return");
 }
