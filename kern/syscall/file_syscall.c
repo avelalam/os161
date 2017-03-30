@@ -358,13 +358,19 @@ void sys__exit(int exitcode){
 	proc_table[curproc->pid]->exitcode = code;
 	lock_release(pt_lock);
 	
-	V(curproc->proc_sem);
-	if(curproc->ppid == -1){
-		sem_destroy(curproc->proc_sem);
-		lock_destroy(pt_lock);
-		proc_destroy(curproc);
+	for(int i=0; i<64; i++){
+                if(curproc->file_table[i] != NULL){
+			if(curproc->file_table[i]->num_refs == 1){                                 
+				vfs_close(curproc->file_table[i]->fileobj);
+				kfree(curproc->file_table[i]->fh_lock);
+				kfree(curproc->file_table[i]);                                     
+                       		curproc->file_table[i] = NULL;
+			 }else{  
+                                curproc->file_table[i]->num_refs--;                                
+                        }                                                                             
+                }                                                                                     
 	}
-
+	V(curproc->proc_sem);
 	thread_exit();
 
 }
@@ -373,7 +379,7 @@ int sys_waitpid(int pid, void* status, int options){
 	if(options != 0){
 		return EINVAL;
 	}
-	if(pid < 3 || pid > 32){
+	if(pid < 2 || pid > 200){
 		return ECHILD;
 	}
 	if(pid == curproc->pid || pid == curproc->ppid){
@@ -385,9 +391,11 @@ int sys_waitpid(int pid, void* status, int options){
 	if(child_proc==NULL){
 		return ESRCH;
 	}
-	if(child_proc->ppid != curproc->pid){
+	if(curproc->pid!=0 && child_proc->ppid != curproc->pid){
 		return ECHILD;
 	}
+	kprintf("here\n");
+	
 	P(child_proc->proc_sem);
 	if(status != NULL){
 		err = copyout(&child_proc->exitcode, (userptr_t) status, sizeof(int ));
@@ -398,16 +406,7 @@ int sys_waitpid(int pid, void* status, int options){
 			return err;
 		}
 	}
-
-	for(int i=3; i<64; i++){
-		if(child_proc->file_table[i] != NULL){
-			if(child_proc->file_table[i]->num_refs == 1){
-				kfree(child_proc->file_table[i]);
-			}else{
-				child_proc->file_table[i]->num_refs--;
-			}
-		}
-	}
+	kprintf("destroying %d\n",pid);
 	sem_destroy(child_proc->proc_sem);	
 	proc_destroy(child_proc);
 	proc_table[pid] = NULL;

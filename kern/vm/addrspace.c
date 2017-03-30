@@ -40,6 +40,11 @@
  * used. The cheesy hack versions in dumbvm.c are used instead.
  */
 
+struct spinlock cm_spinlock;
+
+unsigned num_total_pages;
+struct page_entry *coremap;
+
 struct addrspace *
 as_create(void)
 {
@@ -180,3 +185,105 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 	return 0;
 }
 
+void
+vm_bootstrap(void)
+{
+	/* Do nothing. */
+}
+
+
+vaddr_t alloc_kpages(unsigned npages)
+{
+	paddr_t pa;
+	
+	pa = 0;
+	unsigned i=0,count=0;
+
+	spinlock_acquire(&cm_spinlock);
+	for(i=0; i<num_total_pages; i++){
+		if(coremap[i].page_state != FREE){	
+			count = 0;
+			continue;
+		}
+		count++;
+		if(count == npages){
+			break;
+		}
+	}
+
+	if(count != npages){
+		spinlock_release(&cm_spinlock);
+		return 0;
+	}
+
+	if(count == npages){
+		coremap[i].chunk_size = npages;
+		pa = i*PAGE_SIZE;
+		while(npages!=0){
+			coremap[i].page_state = FIXED;
+			i++;
+			npages--;
+		}
+	}
+
+	spinlock_release(&cm_spinlock);
+	return PADDR_TO_KVADDR(pa);
+	
+}
+
+void
+free_kpages(vaddr_t addr)
+{
+	paddr_t pa = KVADDR_TO_PADDR(addr);
+	KASSERT(pa%PAGE_SIZE==0);
+	int i = pa/4096;
+
+	
+	spinlock_acquire(&cm_spinlock);
+	if(coremap[i].page_state == FIXED){
+		int npages = coremap[i].chunk_size;
+		coremap[i].chunk_size = 0;
+		while(npages != 0){
+			coremap[i].page_state = FREE;
+			npages--;
+			i++;
+		}
+	}	
+	spinlock_release(&cm_spinlock);
+		
+	(void)addr;
+}
+
+unsigned
+int
+coremap_used_bytes() {
+
+	/* dumbvm doesn't track page allocations. Return 0 so that khu works. */
+
+	unsigned count = 0,i;
+	for(i=0; i<num_total_pages; i++){
+		if(coremap[i].page_state!=FREE){
+			count++;
+		}
+	}
+	
+	return count*PAGE_SIZE;
+}
+
+void
+vm_tlbshootdown(const struct tlbshootdown *ts)
+{
+	(void)ts;
+	panic("dumbvm tried to do tlb shootdown?!\n");
+}
+
+int
+vm_fault(int faulttype, vaddr_t faultaddress)
+{
+
+(void)faulttype;
+(void)faultaddress;
+
+return 0;
+
+}

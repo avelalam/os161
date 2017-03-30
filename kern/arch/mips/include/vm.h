@@ -66,7 +66,7 @@
  * a valid address, and will make a *huge* mess if you scribble on it.
  */
 #define PADDR_TO_KVADDR(paddr) ((paddr)+MIPS_KSEG0)
-
+#define KVADDR_TO_PADDR(vaddr) ((vaddr)-MIPS_KSEG0)
 /*
  * The top of user space. (Actually, the address immediately above the
  * last valid user address.)
@@ -82,6 +82,13 @@
  * grows downwards.
  */
 #define USERSTACK     USERSPACETOP
+
+/* Page states */
+#define FIXED   1
+#define FREE    2
+#define DIRTY   3
+#define CLEAN   4
+#define KERNEL  5
 
 /*
  * Interface to the low-level module that looks after the amount of
@@ -125,5 +132,12 @@ struct tlbshootdown {
 
 #define TLBSHOOTDOWN_MAX 16
 
+struct page_entry{
+        int page_state;
+        size_t chunk_size;
+};
 
+extern struct page_entry *coremap;
+extern unsigned num_total_pages;
+extern struct spinlock cm_spinlock;
 #endif /* _MIPS_VM_H_ */

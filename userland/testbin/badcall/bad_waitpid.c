@@ -453,7 +453,7 @@ test_waitpid(void)
 	result = wait_badstatus(KERN_PTR, "wait with kernel pointer status");
 	handle_result(result, &lost_points);
 
-
+	printf("lp:%d\n",lost_points);
 	ntests++;
 	result = wait_unaligned();
 	handle_result(result, &lost_points);
@@ -471,10 +471,12 @@ test_waitpid(void)
 	ntests++;
 	result = wait_parent();
 	handle_result(result, &lost_points);
+	printf("lp:%d\n",lost_points);
 
 	ntests++;
 	result = wait_siblings();
 	handle_result(result, &lost_points);
+	printf("lp:%d\n",lost_points);
 
 	if(!lost_points)
 		success(TEST161_SUCCESS, SECRET, "/testbin/badcall");

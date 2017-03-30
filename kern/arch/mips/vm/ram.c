@@ -31,7 +31,7 @@
 #include <lib.h>
 #include <vm.h>
 #include <mainbus.h>
-
+#include <spinlock.h>
 
 vaddr_t firstfree;   /* first free virtual address; set by start.S */
 
@@ -42,6 +42,38 @@ static paddr_t lastpaddr;   /* one past end of last free physical page */
  * Called very early in system boot to figure out how much physical
  * RAM is available.
  */
+
+unsigned num_total_pages;
+struct page_entry *coremap;
+struct spinlock cm_spinlock;
+static void 
+coremap_init(size_t ramsize){
+	unsigned i;
+	unsigned num_kernel_pages,num_coremap_pages;
+
+	spinlock_init(&cm_spinlock);
+	
+	num_total_pages = ramsize/PAGE_SIZE;
+	num_kernel_pages = (firstfree - MIPS_KSEG0)/PAGE_SIZE;	
+	num_coremap_pages = num_total_pages*sizeof(struct page_entry)/PAGE_SIZE;
+
+	coremap = (struct page_entry*)firstfree;
+	firstfree += num_coremap_pages;	
+	num_kernel_pages += num_coremap_pages;
+
+	kprintf("total:%d\n",num_total_pages);
+	for(i=0; i< num_total_pages; i++){
+		if(i<num_kernel_pages){
+			coremap[i].page_state = KERNEL;
+		}else{
+			coremap[i].page_state = FREE;
+		}
+		coremap[i].chunk_size = 0;
+	}
+	
+	
+	(void)num_kernel_pages;
+}
 void
 ram_bootstrap(void)
 {
@@ -62,15 +94,19 @@ ram_bootstrap(void)
 	}
 
 	lastpaddr = ramsize;
-
+	
 	/*
 	 * Get first free virtual address from where start.S saved it.
 	 * Convert to physical address.
 	 */
-	firstpaddr = firstfree - MIPS_KSEG0;
 
-	kprintf("%uk physical memory available\n",
+	firstpaddr = firstfree - MIPS_KSEG0;
+	coremap_init(ramsize);
+	kprintf("after init:%uk physical memory available\n",
 		(lastpaddr-firstpaddr)/1024);
+
+	
+
 }
 
 /*

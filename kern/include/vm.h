@@ -44,7 +44,6 @@
 #define VM_FAULT_WRITE       1    /* A write was attempted */
 #define VM_FAULT_READONLY    2    /* A write to a readonly page was attempted*/
 
-
 /* Initialization function */
 void vm_bootstrap(void);
 
@@ -64,6 +63,5 @@ unsigned int coremap_used_bytes(void);
 
 /* TLB shootdown handling called from interprocessor_interrupt */
 void vm_tlbshootdown(const struct tlbshootdown *);
-
 
 #endif /* _VM_H_ */

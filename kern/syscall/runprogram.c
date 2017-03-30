@@ -84,7 +84,6 @@ runprogram(char *progname)
 	
 	char *con_name = kstrdup("con:");
         if(curproc->file_table[0]==NULL){
-//                kprintf("initializing stdin\n");
                 curproc->file_table[0] = kmalloc(sizeof(struct fh));
 		curproc->file_table[0]->mode = O_RDONLY&O_ACCMODE;
                 curproc->file_table[0]->fh_lock = lock_create("stdin lock");
@@ -99,6 +98,7 @@ runprogram(char *progname)
 		}
 
         }
+	kfree(con_name);
         
 	con_name = kstrdup("con:");
         if(curproc->file_table[1]==NULL){
@@ -114,7 +114,8 @@ runprogram(char *progname)
                         return -1;
                 }
 	}
-        
+        kfree(con_name);
+
 	con_name = kstrdup("con:");
         if(curproc->file_table[2]==NULL){
   //              kprintf("initializing stderr\n");
@@ -130,6 +131,7 @@ runprogram(char *progname)
                         return -1;
                 }
 	}
+	kfree(con_name);
 	
 	/* Load the executable. */
 	result = load_elf(v, &entrypoint);

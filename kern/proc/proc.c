@@ -56,6 +56,67 @@
  * The process for the kernel; this holds all the kernel-only threads.
  */
 struct proc *kproc;
+/*
+struct page_entry *coremap;
+unsigned num_total_pages;
+struct spinlock cm_spinlock;
+
+static 
+vaddr_t allocpages(unsigned npages)
+{
+	paddr_t pa;
+	
+	pa = 0;
+	unsigned i=0,count=0;
+
+	spinlock_acquire(&cm_spinlock);
+	for(i=0; i<num_total_pages; i++){
+		if(coremap[i].page_state != FREE){	
+			count = 0;
+			continue;
+		}
+		count++;
+		if(count == npages){
+			break;
+		}
+	}
+
+	
+	if(count == npages){
+		kprintf("found at %d\n",i);
+		coremap[i].chunk_size = npages;
+		pa = i*4096;
+		while(npages != 0){
+			coremap[i].page_state = FIXED;
+			i++;
+			npages--;
+		}
+	}
+
+	spinlock_release(&cm_spinlock);
+	return PADDR_TO_KVADDR(pa);
+	
+}
+static void
+freepages(vaddr_t addr)
+{
+	paddr_t pa = KVADDR_TO_PADDR(addr);
+	int i = pa/4096;
+
+	
+	spinlock_acquire(&cm_spinlock);
+	if(coremap[i].page_state == FIXED){
+		int npages = coremap[i].chunk_size;
+		coremap[i].chunk_size = 0;
+		for(int i=0; i<npages; i++){
+			coremap[i].page_state = FREE;
+		}
+	}	
+	spinlock_release(&cm_spinlock);
+		
+	(void)addr;
+}*/
+
 
 /*
  * Create a proc structure.
@@ -65,7 +126,14 @@ struct proc *
 proc_create(const char *name)
 {
 	struct proc *proc;
-//	kprintf("creating proc\n");
+/*
+	kprintf("proc:coremap:%p\nsizeofproc:%d\n",coremap,sizeof(struct proc));
+        struct proc *test = (struct proc*)allocpages((sizeof(struct proc)+PAGE_SIZE-1)/PAGE_SIZE);
+        kprintf("test:%p\n",test);
+
+	struct proc *test1 = (struct proc*)allocpages((sizeof(struct proc)+PAGE_SIZE-1)/PAGE_SIZE);
+        kprintf("test1:%p\n",test1);
+*/
 	proc = kmalloc(sizeof(*proc));
 	if (proc == NULL) {
 		return NULL;
@@ -86,21 +154,6 @@ proc_create(const char *name)
 	proc->p_cwd = NULL;
         proc->next_fd=3;	
 	
-//	char con_name[4] = "con:";
-	/*filetable*/
-//	kprintf("opening stdin\n");
-//	proc->file_table[0]->mode = O_RDONLY;
-//	vfs_open(con_name, O_RDONLY, 0, &(proc->file_table[0]->fileobj));	
-	
-//	kprintf("opening stdout\n");
-//	proc->file_table[1]->mode = O_WRONLY;
-//	vfs_open(con_name, O_WRONLY, 0, &(proc->file_table[1]->fileobj));	
-	
-//	kprintf("openinf stderr\n");
-//	proc->file_table[2]->mode = O_WRONLY;
-//	vfs_open(con_name, O_RDONLY, 0, &(proc->file_table[2]->fileobj));	
-	
-//	kprintf("returning proc");
 	return proc;
 }
 
@@ -350,11 +403,12 @@ proc_wrapper(char* name){
 
 void init_proc_struct(){
 	
+	
 
 	proc_table[2] = curproc;
 	pt_lock = lock_create("pt_lock");
 
-	curproc->pid = 2;
+	curproc->ppid = 1;
 	curproc->proc_sem = sem_create("init_process",0);
 
 }

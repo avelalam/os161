@@ -42,6 +42,7 @@
 #include <vfs.h>
 #include <sfs.h>
 #include <syscall.h>
+#include <file_syscall.h>
 #include <test.h>
 #include <prompt.h>
 #include "opt-sfs.h"
@@ -126,7 +127,7 @@ common_prog(int nargs, char **args)
 	if (proc == NULL) {
 		return ENOMEM;
 	}
-
+	proc->pid = 2;
 	tc = thread_count;
 
 	result = thread_fork(args[0] /* thread name */,
@@ -143,11 +144,11 @@ common_prog(int nargs, char **args)
 	 * The new process will be destroyed when the program exits...
 	 * once you write the code for handling that.
 	 */
-
 	// Wait for all threads to finish cleanup, otherwise khu be a bit behind,
 	// especially once swapping is enabled.
 	thread_wait_for_count(tc);
-
+	sys_waitpid(2, NULL, 0);
+	lock_destroy(pt_lock);
 	return 0;
 }
 
