@@ -70,7 +70,7 @@ coremap_init(size_t ramsize){
 		}
 		coremap[i].chunk_size = 0;
 	}
-	
+
 	
 	(void)num_kernel_pages;
 }

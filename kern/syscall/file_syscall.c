@@ -101,7 +101,7 @@ int sys_open(char *filename,int flags){
 	file_handle->fileobj = fileobj;
 	curproc->file_table[fd] = file_handle;
 	curproc->next_fd++;
-	return -fd;  
+	return -fd;
 }
 
 int sys_read(int fd, void* buf, int buflen){
@@ -394,7 +394,6 @@ int sys_waitpid(int pid, void* status, int options){
 	if(curproc->pid!=0 && child_proc->ppid != curproc->pid){
 		return ECHILD;
 	}
-	kprintf("here\n");
 	
 	P(child_proc->proc_sem);
 	if(status != NULL){
@@ -406,7 +405,6 @@ int sys_waitpid(int pid, void* status, int options){
 			return err;
 		}
 	}
-	kprintf("destroying %d\n",pid);
 	sem_destroy(child_proc->proc_sem);	
 	proc_destroy(child_proc);
 	proc_table[pid] = NULL;

@@ -191,12 +191,10 @@ vm_bootstrap(void)
 	/* Do nothing. */
 }
 
+static 
+vaddr_t getppages(unsigned npages){
 
-vaddr_t alloc_kpages(unsigned npages)
-{
-	paddr_t pa;
-	
-	pa = 0;
+	paddr_t pa=0;
 	unsigned i=0,count=0;
 
 	spinlock_acquire(&cm_spinlock);
@@ -217,16 +215,28 @@ vaddr_t alloc_kpages(unsigned npages)
 	}
 
 	if(count == npages){
+		while(count!=0){
+			coremap[i].page_state = FIXED;
+			i--;
+			count--;
+		}
+		i++;
 		coremap[i].chunk_size = npages;
 		pa = i*PAGE_SIZE;
-		while(npages!=0){
-			coremap[i].page_state = FIXED;
-			i++;
-			npages--;
-		}
 	}
 
 	spinlock_release(&cm_spinlock);
+	return pa;
+}
+
+vaddr_t alloc_kpages(unsigned npages)
+{
+	paddr_t pa;
+	
+	pa = getppages(npages);
+	if(pa == 0){
+		return 0;
+	}
 	return PADDR_TO_KVADDR(pa);
 	
 }
@@ -243,10 +253,8 @@ free_kpages(vaddr_t addr)
 	if(coremap[i].page_state == FIXED){
 		int npages = coremap[i].chunk_size;
 		coremap[i].chunk_size = 0;
-		while(npages != 0){
+		for(;npages!=0;i++,npages--){	
 			coremap[i].page_state = FREE;
-			npages--;
-			i++;
 		}
 	}	
 	spinlock_release(&cm_spinlock);

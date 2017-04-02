@@ -56,67 +56,6 @@
  * The process for the kernel; this holds all the kernel-only threads.
  */
 struct proc *kproc;
-/*
-struct page_entry *coremap;
-unsigned num_total_pages;
-struct spinlock cm_spinlock;
-
-static 
-vaddr_t allocpages(unsigned npages)
-{
-	paddr_t pa;
-	
-	pa = 0;
-	unsigned i=0,count=0;
-
-	spinlock_acquire(&cm_spinlock);
-	for(i=0; i<num_total_pages; i++){
-		if(coremap[i].page_state != FREE){	
-			count = 0;
-			continue;
-		}
-		count++;
-		if(count == npages){
-			break;
-		}
-	}
-
-	
-	if(count == npages){
-		kprintf("found at %d\n",i);
-		coremap[i].chunk_size = npages;
-		pa = i*4096;
-		while(npages != 0){
-			coremap[i].page_state = FIXED;
-			i++;
-			npages--;
-		}
-	}
-
-	spinlock_release(&cm_spinlock);
-	return PADDR_TO_KVADDR(pa);
-	
-}
-static void
-freepages(vaddr_t addr)
-{
-	paddr_t pa = KVADDR_TO_PADDR(addr);
-	int i = pa/4096;
-
-	
-	spinlock_acquire(&cm_spinlock);
-	if(coremap[i].page_state == FIXED){
-		int npages = coremap[i].chunk_size;
-		coremap[i].chunk_size = 0;
-		for(int i=0; i<npages; i++){
-			coremap[i].page_state = FREE;
-		}
-	}	
-	spinlock_release(&cm_spinlock);
-		
-	(void)addr;
-}*/
-
 
 /*
  * Create a proc structure.
@@ -126,15 +65,19 @@ struct proc *
 proc_create(const char *name)
 {
 	struct proc *proc;
-/*
-	kprintf("proc:coremap:%p\nsizeofproc:%d\n",coremap,sizeof(struct proc));
-        struct proc *test = (struct proc*)allocpages((sizeof(struct proc)+PAGE_SIZE-1)/PAGE_SIZE);
+/*        struct proc *test = (struct proc*)allocpages(2);
+        kprintf("test:%p\n",coremap);
         kprintf("test:%p\n",test);
 
-	struct proc *test1 = (struct proc*)allocpages((sizeof(struct proc)+PAGE_SIZE-1)/PAGE_SIZE);
+	struct proc *test1 = (struct proc*)allocpages(4);
         kprintf("test1:%p\n",test1);
-*/
-	proc = kmalloc(sizeof(*proc));
+
+	freepages((vaddr_t)test1);	
+	struct proc *test2 = (struct proc*)allocpages((sizeof(struct proc)+PAGE_SIZE-1)/PAGE_SIZE);
+        kprintf("test1:%p\n",test2);
+	
+	freepages((vaddr_t)test2);	
+*/	proc = kmalloc(sizeof(*proc));
 	if (proc == NULL) {
 		return NULL;
 	}
