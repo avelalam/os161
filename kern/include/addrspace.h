@@ -48,6 +48,25 @@ struct vnode;
  * You write this.
  */
 
+struct pte{
+  int vpn;
+  int ppn;
+  bool state;
+  bool valid;
+  bool referenced;
+
+  struct pte *next;
+};
+
+struct segment{
+  vaddr_t vbase;
+  vaddr_t vend;
+  int readable;
+  int writeable;
+  int executable;
+  struct segment *next;
+};
+
 struct addrspace {
 #if OPT_DUMBVM
         vaddr_t as_vbase1;
@@ -59,6 +78,11 @@ struct addrspace {
         paddr_t as_stackpbase;
 #else
         /* Put stuff here for your VM system */
+        struct segment *segment_table;
+        struct segment *heap;
+        struct segment *stack;
+
+        struct pte *page_table;
 #endif
 };
 

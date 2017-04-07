@@ -74,6 +74,7 @@ coremap_init(size_t ramsize){
 	
 	(void)num_kernel_pages;
 }
+
 void
 ram_bootstrap(void)
 {

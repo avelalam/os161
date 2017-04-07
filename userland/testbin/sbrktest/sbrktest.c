@@ -263,6 +263,7 @@ dosbrk(ssize_t size)
 	void *p;
 
 	p = sbrk(size);
+	// printf("%d\n",(int)p );
 	if (p == (void *)-1) {
 		err(1, "FAILED: sbrk");
 	}
@@ -317,7 +318,6 @@ setup(void)
 
 	op = dosbrk(0);
 	opx = (uintptr_t)op;
-
 	if (opx % PAGE_SIZE) {
 		amount = PAGE_SIZE - (opx % PAGE_SIZE);
 		if (sbrk(amount) == (void *)-1) {

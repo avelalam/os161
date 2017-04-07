@@ -228,6 +228,9 @@ self(const char *arg1, const char *arg2)
 	args[1] = arg1;
 	args[2] = arg2;
 	args[3] = NULL;
+	printf("args0:%s\n", (args[0]));
+	printf("args1:%s\n", (args[1]));
+	printf("args2:%s\n", (args[2]));
 	execv(_PATH_SELF, (char **)args);
 	err(1, "execv");
 }
@@ -242,9 +245,13 @@ main(int argc, char *argv[])
 		self("404", "1");
 	}
 	else if (argc == 2) {
+		printf("arg1:%s\n",argv[1]);
 		self(argv[1], "1");
 	}
 	else if (argc == 3) {
+		printf("arg0:%s\n", argv[0]);
+		printf("arg1:%s\n", argv[1]);
+		printf("arg2:%s\n", argv[2]);
 		if (!strcmp(argv[1], "1") || !strcmp(argv[1], "0")) {
 			nprintf("\n");
 			tprintf("%s\n", argv[2]);

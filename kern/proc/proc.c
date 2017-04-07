@@ -65,19 +65,7 @@ struct proc *
 proc_create(const char *name)
 {
 	struct proc *proc;
-/*        struct proc *test = (struct proc*)allocpages(2);
-        kprintf("test:%p\n",coremap);
-        kprintf("test:%p\n",test);
-
-	struct proc *test1 = (struct proc*)allocpages(4);
-        kprintf("test1:%p\n",test1);
-
-	freepages((vaddr_t)test1);	
-	struct proc *test2 = (struct proc*)allocpages((sizeof(struct proc)+PAGE_SIZE-1)/PAGE_SIZE);
-        kprintf("test1:%p\n",test2);
-	
-	freepages((vaddr_t)test2);	
-*/	proc = kmalloc(sizeof(*proc));
+	proc = kmalloc(sizeof(*proc));
 	if (proc == NULL) {
 		return NULL;
 	}

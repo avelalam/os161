@@ -59,7 +59,8 @@ runprogram(char *progname)
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result, err;
-	
+	struct fh *file_handle;
+
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
 	if (result) {
@@ -82,56 +83,44 @@ runprogram(char *progname)
 	
 	init_proc_struct();
 	
-	char *con_name = kstrdup("con:");
-        if(curproc->file_table[0]==NULL){
-                curproc->file_table[0] = kmalloc(sizeof(struct fh));
-		curproc->file_table[0]->mode = O_RDONLY&O_ACCMODE;
-                curproc->file_table[0]->fh_lock = lock_create("stdin lock");
-		curproc->file_table[0]->num_refs = 1;
-		err = vfs_open(con_name, O_RDONLY, 0, &(curproc->file_table[0]->fileobj));
-        	if (err) {
-                	kprintf("Could not open %s for stdin: %s\n",
-                        con_name, strerror(err));
-                	return -1;
-        	}else{
-//			kprintf("opened %s for stdin\n", con_name);
-		}
-
-        }
-	kfree(con_name);
+	char *con_stdin = kstrdup("con:");
+	file_handle = kmalloc(sizeof(struct fh));
+	file_handle->mode = O_RDONLY&O_ACCMODE;
+	file_handle->fh_lock = lock_create("stdin lock");
+	file_handle->num_refs = 1;
+	err = vfs_open(con_stdin, O_RDONLY, 0, &(file_handle->fileobj));
+	if (err) {
+		kfree(file_handle);
+		return -1;
+	}
+	curproc->file_table[0]=file_handle;
+	kfree(con_stdin);
         
-	con_name = kstrdup("con:");
-        if(curproc->file_table[1]==NULL){
- //               kprintf("initializing stdout\n");
-                curproc->file_table[1] = kmalloc(sizeof(struct fh));
-                curproc->file_table[1]->mode = O_WRONLY&O_ACCMODE;
-                curproc->file_table[1]->fh_lock = lock_create("stdout lock");
-		curproc->file_table[1]->num_refs = 1;
-                err = vfs_open(con_name, O_WRONLY, 0, &(curproc->file_table[1]->fileobj));
-        	if (err) {
-                        kprintf("Could not open %s for stdout: %s\n",
-                        con_name, strerror(err));
-                        return -1;
-                }
+	char *con_stdout = kstrdup("con:");
+	file_handle = kmalloc(sizeof(struct fh));
+	file_handle->mode = O_WRONLY&O_ACCMODE;
+	file_handle->fh_lock = lock_create("stdout lock");
+	file_handle->num_refs = 1;
+	err = vfs_open(con_stdout, O_WRONLY, 0, &(file_handle->fileobj));
+	if (err) {
+		kfree(file_handle);
+		return -1;
 	}
-        kfree(con_name);
+	curproc->file_table[1] = file_handle;
+	kfree(con_stdout);
 
-	con_name = kstrdup("con:");
-        if(curproc->file_table[2]==NULL){
-  //              kprintf("initializing stderr\n");
-                curproc->file_table[2] = kmalloc(sizeof(struct fh));
-                curproc->file_table[2]->mode = O_WRONLY&O_ACCMODE;
-                curproc->file_table[2]->fh_lock = lock_create("stdout lock");
-		curproc->file_table[2]->num_refs = 1;
-                err = vfs_open(con_name, O_WRONLY, 0, &(curproc->file_table[2]->fileobj));
-        	if (err) {
-                        kprintf("Could not open %s for stderr\n",
-                        con_name);
-			kprintf("%d\n",err);
-                        return -1;
-                }
+	char *con_stderr = kstrdup("con:");
+	file_handle = kmalloc(sizeof(struct fh));
+	file_handle->mode = O_WRONLY&O_ACCMODE;
+	file_handle->fh_lock = lock_create("stdout lock");
+	file_handle->num_refs = 1;
+	err = vfs_open(con_stderr, O_WRONLY, 0, &(file_handle->fileobj));
+	if (err) {
+		kfree(file_handle);
+		return -1;
 	}
-	kfree(con_name);
+	curproc->file_table[2] = file_handle;
+	kfree(con_stderr);
 	
 	/* Load the executable. */
 	result = load_elf(v, &entrypoint);
@@ -140,6 +129,7 @@ runprogram(char *progname)
 		vfs_close(v);
 		return result;
 	}
+
 
 	/* Done with the file now. */
 	vfs_close(v);

@@ -91,7 +91,6 @@ cmd_progthread(void *ptr, unsigned long nargs)
 	KASSERT(strlen(args[0]) < sizeof(progname));
 
 	strcpy(progname, args[0]);
-
 	result = runprogram(progname);
 	if (result) {
 		kprintf("Running program %s failed: %s\n", args[0],
@@ -139,7 +138,7 @@ common_prog(int nargs, char **args)
 		proc_destroy(proc);
 		return result;
 	}
-
+	
 	/*
 	 * The new process will be destroyed when the program exits...
 	 * once you write the code for handling that.
@@ -147,8 +146,14 @@ common_prog(int nargs, char **args)
 	// Wait for all threads to finish cleanup, otherwise khu be a bit behind,
 	// especially once swapping is enabled.
 	thread_wait_for_count(tc);
-	sys_waitpid(2, NULL, 0);
+	for(int pid=2; pid<200; pid++){
+		if(proc_table[pid] != NULL){
+			sys_waitpid(pid, NULL, 0);
+		}
+	}
+	
 	lock_destroy(pt_lock);
+	
 	return 0;
 }
 

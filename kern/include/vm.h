@@ -44,6 +44,9 @@
 #define VM_FAULT_WRITE       1    /* A write was attempted */
 #define VM_FAULT_READONLY    2    /* A write to a readonly page was attempted*/
 
+#define VPN(addr)			((addr>>12))
+#define OFFSET(addr)		((addr & 0x00000fff))
+
 /* Initialization function */
 void vm_bootstrap(void);
 
@@ -53,7 +56,7 @@ int vm_fault(int faulttype, vaddr_t faultaddress);
 /* Allocate/free kernel heap pages (called by kmalloc/kfree) */
 vaddr_t alloc_kpages(unsigned npages);
 void free_kpages(vaddr_t addr);
-
+void* testret(void* addr);
 /*
  * Return amount of memory (in bytes) used by allocated coremap pages.  If
  * there are ongoing allocations, this value could change after it is returned

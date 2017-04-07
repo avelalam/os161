@@ -84,7 +84,7 @@
 #define USERSTACK     USERSPACETOP
 
 /* Page states */
-#define FIXED   1
+#define USER   1
 #define FREE    2
 #define DIRTY   3
 #define CLEAN   4

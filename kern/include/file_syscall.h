@@ -16,6 +16,7 @@ int sys_getpid(void);
 int sys_waitpid(int pid, void* status, int options);
 void sys__exit(int exitcode);
 int sys_execv(char *prog_name, char **args);
+int sys_sbrk(intptr_t amount, int *retval);
 
 //struct args_buffer{
 //

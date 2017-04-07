@@ -63,7 +63,6 @@ int sys_write(int fd, const void *buf,int buflen){
 int sys_open(char *filename,int flags){
 
 	struct fh *file_handle;
-	struct vnode *fileobj;
 	int fd,err;
 	size_t len;
 	char name[PATH_MAX];
@@ -79,26 +78,32 @@ int sys_open(char *filename,int flags){
 	file_handle->num_refs=1;
 	file_handle->fh_lock=lock_create("sdjf");
 	
-	
-	err=vfs_open(filename,flags,0,&(fileobj)); 
+	err=vfs_open(name,flags,0,&(file_handle->fileobj)); 
 	if(err){
+		lock_destroy(file_handle->fh_lock);
+		kfree(file_handle);
 		return err;
 	}
-	if(fileobj == NULL && ((flags & O_CREAT) == O_CREAT)){
-		err = VOP_CREAT(curproc->p_cwd, filename, ((flags&O_EXCL)==O_EXCL), 0, &(fileobj));
+	if(file_handle->fileobj == NULL && ((flags & O_CREAT) == O_CREAT)){
+		err = VOP_CREAT(curproc->p_cwd, name, ((flags&O_EXCL)==O_EXCL), 0, &(file_handle->fileobj));
 		if(err){
+			vfs_close(file_handle->fileobj);
+			lock_destroy(file_handle->fh_lock);
+			kfree(file_handle);
 			return err;
 		}
 	}
 	if((flags&O_TRUNC) == O_TRUNC){
-		err = VOP_TRUNCATE(fileobj, 0);
+		err = VOP_TRUNCATE(file_handle->fileobj, 0);
 		if(err){
+			vfs_close(file_handle->fileobj);			
+			lock_destroy(file_handle->fh_lock);
+			kfree(file_handle);
 			return err;
 		}
 	}
 	
 
-	file_handle->fileobj = fileobj;
 	curproc->file_table[fd] = file_handle;
 	curproc->next_fd++;
 	return -fd;
@@ -145,6 +150,7 @@ int sys_read(int fd, void* buf, int buflen){
 }
 
 int sys_close(int fd){
+	
 	if(fd>63 || fd <0){
 		return EBADF;
 	}
@@ -155,12 +161,14 @@ int sys_close(int fd){
 	if((curproc->file_table[fd]->num_refs == 1)){
 		vfs_close(curproc->file_table[fd]->fileobj);
 		lock_release(curproc->file_table[fd]->fh_lock);
-		kfree(curproc->file_table[fd]->fh_lock);
+		lock_destroy(curproc->file_table[fd]->fh_lock);
+		curproc->file_table[fd]->fh_lock=NULL;
 		kfree(curproc->file_table[fd]);
-		curproc->file_table[fd] = NULL;	
+		curproc->file_table[fd] = NULL;
 	}else{
 		curproc->file_table[fd]->num_refs--;
 		lock_release(curproc->file_table[fd]->fh_lock);
+		curproc->file_table[fd] = NULL;
 	}
 	return 0;
 }
@@ -175,12 +183,13 @@ int sys_chdir(const void *pathname){
 	if(err){
 		return err;
 	}	
-	err = vfs_chdir((char *)pathname);
+	err = vfs_chdir(name);
 	if(err){
 		return err;
 	}
 	return 0;
 }
+
 off_t sys_lseek(int fd,int high_32,int low_32,const void *whence_ptr){
 
  	if(fd<3 || fd>63){
@@ -255,13 +264,15 @@ int sys_dup2(int oldfd,int newfd){
 		return EBADF;
 	}	
 	
- 	lock_acquire(curproc->file_table[oldfd]->fh_lock);
-	if(curproc->file_table[newfd]!=NULL){
-		vfs_close(curproc->file_table[newfd]->fileobj);
-	}
-	curproc->file_table[newfd]=curproc->file_table[oldfd];
-	curproc->file_table[oldfd]->num_refs++;
-	lock_release(curproc->file_table[oldfd]->fh_lock);
+ 	if(newfd != oldfd){
+ 		lock_acquire(curproc->file_table[oldfd]->fh_lock);
+		if(curproc->file_table[newfd]!=NULL){
+			sys_close(newfd);
+		}
+		curproc->file_table[newfd]=curproc->file_table[oldfd];
+		curproc->file_table[oldfd]->num_refs++;
+		lock_release(curproc->file_table[oldfd]->fh_lock);
+ 	}
 	
 
 	
@@ -302,19 +313,22 @@ int sys_fork(struct trapframe *tf){
 	
 	newproc = proc_create_runprogram("child");
 	if(newproc == NULL){
+		kfree(child_tf);
 		return ENOMEM;
 	}
 
 	int err = as_copy(curproc->p_addrspace, &newproc->p_addrspace);
 	if(err){
+		proc_destroy(newproc);
+		kfree(child_tf);
 		return err;
-	}	
-	
+	}
+
 	newproc->next_fd = curproc->next_fd;
 	for(int i=0; i<64; i++){
 		if(curproc->file_table[i] == NULL){
 			newproc->file_table[i] = NULL;
-		}else{	
+		}else{
 			lock_acquire(curproc->file_table[i]->fh_lock);	
 			curproc->file_table[i]->num_refs++;
 			newproc->file_table[i] = curproc->file_table[i];
@@ -326,6 +340,7 @@ int sys_fork(struct trapframe *tf){
 	newproc->proc_sem = sem_create("procsec",0);
 
 	lock_acquire(pt_lock);	
+		
 	for(pid=3; pid<200; pid++){
 		if(proc_table[pid] == NULL){
 			break;
@@ -337,6 +352,8 @@ int sys_fork(struct trapframe *tf){
 
 	err = thread_fork("childthread", newproc, enter_forked_process, (void*)child_tf, 0);
 	if(err){
+		proc_destroy(newproc);
+		kfree(child_tf);
 		return err;
 	}
 
@@ -350,27 +367,19 @@ int sys_getpid(){
 }
 
 void sys__exit(int exitcode){
-
 	int code=0;
 	code = _MKWAIT_EXIT(exitcode);
 	lock_acquire(pt_lock);
 	proc_table[curproc->pid]->exit_status = true;
 	proc_table[curproc->pid]->exitcode = code;
-	lock_release(pt_lock);
 	
 	for(int i=0; i<64; i++){
-                if(curproc->file_table[i] != NULL){
-			if(curproc->file_table[i]->num_refs == 1){                                 
-				vfs_close(curproc->file_table[i]->fileobj);
-				kfree(curproc->file_table[i]->fh_lock);
-				kfree(curproc->file_table[i]);                                     
-                       		curproc->file_table[i] = NULL;
-			 }else{  
-                                curproc->file_table[i]->num_refs--;                                
-                        }                                                                             
-                }                                                                                     
+		if(curproc->file_table[i] != NULL){
+			sys_close(i);
+		}                                                                                     
 	}
 	V(curproc->proc_sem);
+	lock_release(pt_lock);
 	thread_exit();
 
 }
@@ -446,6 +455,7 @@ int sys_execv(char *prog_name,char **args){
 			kfree(inargs);
 			return err;
 		}
+		// kprintf("buffer:%s\n", &buffer1[index]);
 		index += len-1;
 		buffer1[index++] = '\0';
 		strspace += 1+(len/4);
@@ -460,8 +470,16 @@ int sys_execv(char *prog_name,char **args){
 		return err;
 	}
 
-	curproc->p_addrspace = as_create();
-	proc_setas(curproc->p_addrspace);
+	struct addrspace *as;
+	as = curproc->p_addrspace;
+	struct addrspace *newas = as_create();
+	if(newas == NULL){
+		vfs_close(v);
+		curproc->p_addrspace = as;
+		return ENOMEM;
+	}
+	proc_setas(newas);
+	as_destroy(as);
 	as_activate();
 		
 	err = load_elf(v, &entrypoint);
@@ -476,6 +494,7 @@ int sys_execv(char *prog_name,char **args){
 	if(err){
 		return err;
 	}
+	kprintf("stackptr:%p\n",(void*)stackptr);
 	
 	stackptr -= strspace*4;
 	stackptr -= 4*(argc+1);
@@ -488,13 +507,28 @@ int sys_execv(char *prog_name,char **args){
 	s_ptr += 4;
 	j=0;
 	*ptrptr = (char*)stackptr;
+
+	// for(int i=argc-1; i>=0;i--){
+	// 	str_len = strlen(&(buffer1[j]));
+	// 	kprintf("in stack:%s\n",(char*)s_ptr);
+	// 	s_ptr += str_len;
+	// 	int nulls = 1+(str_len/4);
+	// 	nulls *= 4;
+	// 	nulls -= str_len;
+	// 	s_ptr += nulls;
+	// 	j+=str_len+1;
+
+	// }
+	// j=0;
 	for(int i=argc-1; i>=0; i--){
 		
 		str_len = strlen(&(buffer1[j]));
+		kprintf("i:%d,%s,  %d\n",i, (char*)(s_ptr-12), str_len);
 		err = copyout(&buffer1[j], (userptr_t)s_ptr, str_len);
 		if(err){
 			return err;
 		}
+		// kprintf("i:%d,%s\n", i, (char*)s_ptr);
 		//refering to actual argument
 		err = copyout(&s_ptr, (userptr_t)*ptrptr, sizeof(int));
 		if(err){
@@ -516,5 +550,19 @@ int sys_execv(char *prog_name,char **args){
 	(void)prog_name;
 	(void)args;
 	
+	return 0;
+}
+
+int sys_sbrk(intptr_t amount, int *retval){
+
+	struct segment *heap = curproc->p_addrspace->heap;
+	kprintf("heap end:%x, amount:%x\n",(int)heap->vend, (int)amount);
+
+	if(heap->vend+amount < heap->vbase || (heap->vend+amount)%PAGE_SIZE != 0){
+		return EINVAL;
+	}
+	*retval = heap->vend;
+	heap->vend += amount;
+
 	return 0;
 }

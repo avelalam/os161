@@ -1207,6 +1207,9 @@ subpage_kfree(void *ptr)
 	return 0;
 }
 
+void* testret(void* addr){
+	return addr;
+}
 //
 ////////////////////////////////////////////////////////////
 
@@ -1242,14 +1245,13 @@ kmalloc(size_t sz)
 			return NULL;
 		}
 		KASSERT(address % PAGE_SIZE == 0);
-
 		return (void *)address;
 	}
 
 #ifdef LABELS
 	return subpage_kmalloc(sz, label);
 #else
-	return subpage_kmalloc(sz);
+	return testret(subpage_kmalloc(sz));
 #endif
 }
 

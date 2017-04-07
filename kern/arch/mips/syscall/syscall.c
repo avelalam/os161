@@ -77,6 +77,8 @@
  * registerized values, with copyin().
  */
 
+int errno;
+
 void
 syscall(struct trapframe *tf)
 {
@@ -201,6 +203,15 @@ syscall(struct trapframe *tf)
 		sys__exit((int)tf->tf_a0);
 		err = 0;
 		break;
+
+		case SYS_sbrk:
+		err = sys_sbrk((intptr_t)tf->tf_a0, &retval);
+		if(err){
+			errno = err;
+		}
+		break;
+
+
 	   /* Add stuff here */
 
 	    default:
