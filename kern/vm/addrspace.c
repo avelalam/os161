@@ -96,7 +96,8 @@ void takepppages(paddr_t paddr, int page_type){
 	if(coremap[i].page_state == page_type){
 		int npages = coremap[i].chunk_size;
 		coremap[i].chunk_size = 0;
-		for(;npages!=0;i++,npages--){	
+		for(;npages!=0;i++,npages--){
+			memset((void*)PADDR_TO_KVADDR(i*PAGE_SIZE), '\0', PAGE_SIZE);	
 			coremap[i].page_state = FREE;
 		}
 	}	
@@ -171,8 +172,8 @@ void page_table_copy(struct pte *old, struct pte **ret){
 	prev = new;
 
 	while(old != NULL){
-		kprintf("copying pte:%p\n",(void*)(old->vpn*PAGE_SIZE));
-		kprintf("data:%s\n",(char*)(PADDR_TO_KVADDR(old->ppn*PAGE_SIZE)));
+		// kprintf("copying pte:%p\n",(void*)(old->vpn*PAGE_SIZE));
+		// kprintf("data:%s\n",(char*)(PADDR_TO_KVADDR(old->ppn*PAGE_SIZE)));
 		struct pte *curr = kmalloc(sizeof(struct pte));
 		curr->vpn = old->vpn;
 		paddr = getppages(1, USER);

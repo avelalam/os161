@@ -421,7 +421,6 @@ int sys_waitpid(int pid, void* status, int options){
 }
 
 int sys_execv(char *prog_name,char **args){
-	
 	int err, argc=0;
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;		
@@ -470,6 +469,7 @@ int sys_execv(char *prog_name,char **args){
 		return err;
 	}
 
+
 	struct addrspace *as;
 	as = curproc->p_addrspace;
 	struct addrspace *newas = as_create();
@@ -494,7 +494,7 @@ int sys_execv(char *prog_name,char **args){
 	if(err){
 		return err;
 	}
-	kprintf("stackptr:%p\n",(void*)stackptr);
+	// kprintf("stackptr:%p\n",(void*)stackptr);
 	
 	stackptr -= strspace*4;
 	stackptr -= 4*(argc+1);
@@ -523,8 +523,8 @@ int sys_execv(char *prog_name,char **args){
 	for(int i=argc-1; i>=0; i--){
 		
 		str_len = strlen(&(buffer1[j]));
-		kprintf("i:%d,%s,  %d\n",i, (char*)(s_ptr-12), str_len);
-		err = copyout(&buffer1[j], (userptr_t)s_ptr, str_len);
+		// kprintf("i:%d,%s,  %d\n",i, (char*)(s_ptr-12), str_len);
+		err = copyout(&buffer1[j], (userptr_t)s_ptr, str_len+1);
 		if(err){
 			return err;
 		}
@@ -556,13 +556,16 @@ int sys_execv(char *prog_name,char **args){
 int sys_sbrk(intptr_t amount, int *retval){
 
 	struct segment *heap = curproc->p_addrspace->heap;
-	kprintf("heap end:%x, amount:%x\n",(int)heap->vend, (int)amount);
+	// kprintf("heap end:%x, amount:%x\n",(int)heap->vend, (int)amount);
 
 	if(heap->vend+amount < heap->vbase || (heap->vend+amount)%PAGE_SIZE != 0){
 		return EINVAL;
 	}
 	*retval = heap->vend;
 	heap->vend += amount;
+
+	(void)amount;
+	(void)retval;
 
 	return 0;
 }
