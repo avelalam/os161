@@ -41,6 +41,8 @@
 #include <syscall.h>
 #include <addrspace.h>
 #include <file_syscall.h>
+#include <kern/wait.h>
+
 
 /* in exception-*.S */
 extern __DEAD void asm_usermode(struct trapframe *tf);
@@ -112,7 +114,19 @@ kill_curthread(vaddr_t epc, unsigned code, vaddr_t vaddr)
 	/*
 	 * You will probably want to change this.
 	 */
-	sys__exit(0);
+	
+	lock_acquire(pt_lock);
+	proc_table[curproc->pid]->exit_status = true;
+	proc_table[curproc->pid]->exitcode = _MKWAIT_SIG(sig);
+	
+	for(int i=0; i<64; i++){
+		if(curproc->file_table[i] != NULL){
+			sys_close(i);
+		}                                                                                     
+	}
+	V(curproc->proc_sem);
+	lock_release(pt_lock);
+	thread_exit();
 	kprintf("Fatal user mode trap %u sig %d (%s, epc 0x%x, vaddr 0x%x)\n",
 		code, sig, trapcodenames[code], epc, vaddr);
 	//panic("I don't know how to handle this\n");

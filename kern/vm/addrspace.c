@@ -86,8 +86,8 @@ vaddr_t getppages(unsigned npages, int page_type){
 	return pa;
 }
 
-static
-void takepppages(paddr_t paddr, int page_type){
+
+void takeppages(paddr_t paddr, int page_type){
 
 	int i = paddr/4096;
 
@@ -277,7 +277,7 @@ void page_table_destroy(struct addrspace *as){
 	while(page_table != NULL){
 		currpage = page_table;
 		page_table = page_table->next;
-		takepppages((currpage->ppn)*PAGE_SIZE, USER);
+		takeppages((currpage->ppn)*PAGE_SIZE, USER);
 		kfree(currpage);
 	}
 	(void)as;
@@ -480,7 +480,7 @@ free_kpages(vaddr_t vaddr)
 	paddr_t pa = KVADDR_TO_PADDR(vaddr);
 	KASSERT(pa%PAGE_SIZE==0);
 	
-	takepppages(pa, KERNEL);
+	takeppages(pa, KERNEL);
 	(void)vaddr;
 }
 
@@ -570,6 +570,7 @@ int valid(vaddr_t faultaddress){
 		segment = segment->next;
 	}
 
+	// kprintf("Fault addr %p\n",(void*)faultaddress);
 	segment = as->heap;
 	if(segment->vbase <= faultaddress && faultaddress < segment->vend ){
 			return 1;
@@ -593,7 +594,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 (void)faultaddress;
 
 if(!valid(faultaddress)){
-	// kprintf("Fault addr %p\n",(void*)faultaddress);
+	kprintf("Fault addr %p\n",(void*)faultaddress);
 	return EFAULT;
 }
 

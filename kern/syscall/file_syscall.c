@@ -369,6 +369,7 @@ int sys_getpid(){
 void sys__exit(int exitcode){
 	int code=0;
 	code = _MKWAIT_EXIT(exitcode);
+	// kprintf("code:%d\n",code);
 	lock_acquire(pt_lock);
 	proc_table[curproc->pid]->exit_status = true;
 	proc_table[curproc->pid]->exitcode = code;
@@ -557,11 +558,49 @@ int sys_sbrk(intptr_t amount, int *retval){
 
 	struct segment *heap = curproc->p_addrspace->heap;
 	// kprintf("heap end:%x, amount:%x\n",(int)heap->vend, (int)amount);
+	// kprintf("size:%d\n",sizeof(amount));
+	int x = heap->vbase - heap->vend;
+	if(amount < x){
+		return EINVAL;
+	}
+	if(heap->vend+amount >= curproc->p_addrspace->stack->vbase){
+		return ENOMEM;
+	}
 
 	if(heap->vend+amount < heap->vbase || (heap->vend+amount)%PAGE_SIZE != 0){
 		return EINVAL;
 	}
+
+
 	*retval = heap->vend;
+	int oldend = heap->vend/PAGE_SIZE;
+	int newend = heap->vend+amount/PAGE_SIZE;
+
+	if(amount<0){
+		struct pte *curr = curproc->p_addrspace->page_table;
+		struct pte *prev = NULL;
+	    struct pte *next =NULL;
+		while(curr!=NULL){
+	        next=curr->next;
+	        if(curr->vpn>=newend && curr->vpn<=oldend){
+	        	if(prev!=NULL){
+	        		prev->next=curr->next;
+	        		takeppages(curr->ppn*4096,USER);
+	        		kfree(curr);
+	        	}
+	        	else if(prev==NULL){
+	        		curproc->p_addrspace->page_table=next;
+	        		takeppages(curr->ppn*4096,USER);
+	        		kfree(curr);
+	        	}
+	        	
+	        }
+			curr = next;
+		}
+	}
+
+	// (void)oldend;
+	// (void)newend;
 	heap->vend += amount;
 
 	(void)amount;
