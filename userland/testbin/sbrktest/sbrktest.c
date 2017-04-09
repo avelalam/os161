@@ -263,7 +263,6 @@ dosbrk(ssize_t size)
 	void *p;
 
 	p = sbrk(size);
-	// printf("%d\n",(int)p );
 	if (p == (void *)-1) {
 		err(1, "FAILED: sbrk");
 	}
@@ -290,12 +289,10 @@ expect_segfault(segfault_fn func)
 		func();	// This exits
 	} else {
 		result = waitpid(pid, &status, 0);
-		printf("status:%d\n", status);
 		if (result == -1) {
 			err(1, "waitpid");
 		}
 		else if (WIFSIGNALED(status)) {
-			printf("here\n");
 			if (WTERMSIG(status) != 11) {
 				errx(1, "child: Signal %d", WTERMSIG(status));
 			}
@@ -521,9 +518,7 @@ test5_helper(void)
 {
 	void *p;
 	p = dosbrk(0);
-	printf("%p\n",p );
 	tprintf("This should produce fatal signal 11 (SIGSEGV).\n");
-	// printf("%p\n", p[10]);
 	((long *)p)[10] = 0;
 	errx(1, "FAILED: I didn't crash");
 }

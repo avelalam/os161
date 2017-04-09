@@ -147,19 +147,21 @@ as_create(void)
 }
 
 static
-void page_table_copy(struct pte *old, struct pte **ret){
+int page_table_copy(struct pte *old, struct pte **ret){
 
 	struct pte *new = NULL;
 	struct pte *prev;
 
-	if(old == NULL){
-		*ret = NULL;
-		return;
-	}
 	paddr_t paddr;
 	new = kmalloc(sizeof(struct pte));
+	if(new == NULL){
+		return ENOMEM;
+	}
 	new->vpn = old->vpn;
 	paddr = getppages(1, USER);
+	if(paddr == 0){
+		return ENOMEM;
+	}
 	memmove((void*)PADDR_TO_KVADDR(paddr),
 		(const void*)PADDR_TO_KVADDR(old->ppn*PAGE_SIZE),
 		PAGE_SIZE);
@@ -175,8 +177,14 @@ void page_table_copy(struct pte *old, struct pte **ret){
 		// kprintf("copying pte:%p\n",(void*)(old->vpn*PAGE_SIZE));
 		// kprintf("data:%s\n",(char*)(PADDR_TO_KVADDR(old->ppn*PAGE_SIZE)));
 		struct pte *curr = kmalloc(sizeof(struct pte));
+		if(curr == NULL){
+			return ENOMEM;
+		}
 		curr->vpn = old->vpn;
 		paddr = getppages(1, USER);
+		if(paddr == 0){
+			return ENOMEM;
+		}
 		memmove((void*)PADDR_TO_KVADDR(paddr),
 			(const void*)PADDR_TO_KVADDR(old->ppn*PAGE_SIZE),
 			PAGE_SIZE);
@@ -191,6 +199,7 @@ void page_table_copy(struct pte *old, struct pte **ret){
 		old = old->next;
 	}
 	*ret = new;
+	return 0;
 }
 
 int
@@ -208,11 +217,6 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 	 */
 
 	struct segment *currseg = old->segment_table;
-	if(currseg == NULL){
-		page_table_copy(old->page_table, &newas->page_table);
-		*ret = newas;
-		return 0;
-	}
 
 	vaddr_t vaddr;
 	size_t memsize;
@@ -244,9 +248,10 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 	newas->stack->writeable = currseg->writeable;
 	newas->stack->executable = currseg->executable;
 
-	page_table_copy(old->page_table, &newas->page_table);
-
-
+	int err = page_table_copy(old->page_table, &newas->page_table);
+	if(err){
+		return err;
+	}
 
 	*ret = newas;
 	return 0;
@@ -436,10 +441,12 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 
 /* Add the given page to the page_table*/
 static 
-void page_table_add(paddr_t paddr, vaddr_t vaddr){
+int page_table_add(paddr_t paddr, vaddr_t vaddr){
 
 	struct pte *new_pte = kmalloc(sizeof(struct pte));
-	
+	if(new_pte == NULL){
+		return ENOMEM;
+	}
 	new_pte->vpn = VPN(vaddr);
 	new_pte->ppn = paddr/PAGE_SIZE;
 	new_pte->next = NULL;
@@ -452,6 +459,8 @@ void page_table_add(paddr_t paddr, vaddr_t vaddr){
 		new_pte->next = page_table;
 		curproc->p_addrspace->page_table = new_pte;
 	}
+
+	return 0;
 	// kprintf("paddr:%p\n",(void*)paddr);
 	// kprintf("added pte vpn:%d, ppn:%d, vaddr:%p\n", new_pte->vpn, new_pte->ppn, (void*)vaddr);
 }
@@ -550,9 +559,14 @@ paddr_t tlb_fault(vaddr_t faultaddress){
 	}
 
 	paddr = getppages(1, USER);
+	if(paddr == 0){
+		return 0;
+	}
 
-	page_table_add(paddr, faultaddress);
-
+	int err = page_table_add(paddr, faultaddress);
+	if(err){
+		return 0;
+	}
 	return paddr;
 }
 
@@ -593,14 +607,18 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 (void)faulttype;
 (void)faultaddress;
 
+// kprintf("Fault addr %p\n",(void*)faultaddress);
 if(!valid(faultaddress)){
-	kprintf("Fault addr %p\n",(void*)faultaddress);
+	// kprintf("Fault addr %p\n",(void*)faultaddress);
 	return EFAULT;
 }
 
 paddr_t paddr;
 
 paddr = tlb_fault(faultaddress);
+if(paddr == 0){
+	return ENOMEM;
+}
 // kprintf("pddr:%p\n", (void*)paddr);
 
 /* make sure it's page-aligned */

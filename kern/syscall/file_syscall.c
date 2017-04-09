@@ -17,6 +17,7 @@
 #include <addrspace.h>
 #include <syscall.h>
 #include <limits.h>
+#include <mips/tlb.h>
 #define EOF (-1)
 
 int sys_write(int fd, const void *buf,int buflen){
@@ -304,7 +305,7 @@ int sys_fork(struct trapframe *tf){
 
 	struct proc *newproc;
 	struct trapframe *child_tf;
-	int pid;
+	int pid=0;
 	child_tf = kmalloc(sizeof(struct trapframe));
 	if(child_tf == NULL){
 		return ENOMEM;
@@ -317,6 +318,7 @@ int sys_fork(struct trapframe *tf){
 		return ENOMEM;
 	}
 
+	KASSERT(curproc->p_addrspace != NULL);
 	int err = as_copy(curproc->p_addrspace, &newproc->p_addrspace);
 	if(err){
 		proc_destroy(newproc);
@@ -346,6 +348,12 @@ int sys_fork(struct trapframe *tf){
 			break;
 		}
 	}
+	if(pid==0){
+		kprintf("full\n");
+		lock_release(pt_lock);
+		return 	EMPROC;
+	}
+	// kprintf("newpid:%d\n",pid);
 	newproc->pid = pid;
 	proc_table[newproc->pid] = newproc;	
 	lock_release(pt_lock);	
@@ -559,6 +567,7 @@ int sys_sbrk(intptr_t amount, int *retval){
 	struct segment *heap = curproc->p_addrspace->heap;
 	// kprintf("heap end:%x, amount:%x\n",(int)heap->vend, (int)amount);
 	// kprintf("size:%d\n",sizeof(amount));
+	// kprintf("before%d\n",coremap_used_bytes());
 	int x = heap->vbase - heap->vend;
 	if(amount < x){
 		return EINVAL;
@@ -574,30 +583,43 @@ int sys_sbrk(intptr_t amount, int *retval){
 
 	*retval = heap->vend;
 	int oldend = heap->vend/PAGE_SIZE;
-	int newend = heap->vend+amount/PAGE_SIZE;
+	int newend = (heap->vend+amount)/PAGE_SIZE;
 
 	if(amount<0){
 		struct pte *curr = curproc->p_addrspace->page_table;
 		struct pte *prev = NULL;
 	    struct pte *next =NULL;
+	    int i, ehi;
+	    // kprintf("old:%x, new:%x\n", oldend, newend);
 		while(curr!=NULL){
 	        next=curr->next;
 	        if(curr->vpn>=newend && curr->vpn<=oldend){
+	        	// kprintf("removing:%p\n",(void*)curr->vpn);
+	        	ehi = curr->vpn*PAGE_SIZE;
+	        	i = tlb_probe(ehi, 0);
+	        	if(i>0){
+					tlb_write(TLBHI_INVALID(i), TLBLO_INVALID(), i);	        		
+	        	}
 	        	if(prev!=NULL){
 	        		prev->next=curr->next;
 	        		takeppages(curr->ppn*4096,USER);
 	        		kfree(curr);
+	        		curr = NULL;
 	        	}
 	        	else if(prev==NULL){
 	        		curproc->p_addrspace->page_table=next;
 	        		takeppages(curr->ppn*4096,USER);
 	        		kfree(curr);
+	        		curr = NULL;
 	        	}
-	        	
+	        }
+	        if(curr != NULL){
+	        	prev = curr;
 	        }
 			curr = next;
 		}
 	}
+	// kprintf("before%d\n",coremap_used_bytes());
 
 	// (void)oldend;
 	// (void)newend;
