@@ -48,6 +48,9 @@ struct vnode;
  * You write this.
  */
 
+#define INMEMORY  0
+#define DISK      1
+
 struct pte{
   int vpn;
   int ppn;
@@ -83,6 +86,7 @@ struct addrspace {
         struct segment *stack;
 
         struct pte *page_table;
+        struct lock *page_table_lock;
 #endif
 };
 
@@ -151,6 +155,13 @@ void takeppages(paddr_t paddr, int page_type);
  */
 
 int load_elf(struct vnode *v, vaddr_t *entrypoint);
+int write_to_disk(vaddr_t vaddr, int index);
+int read_from_disk(vaddr_t vaddr, int index);
+paddr_t swapout(void);
+paddr_t swapin(vaddr_t vaddr);
 
+
+struct vnode *disk;
+struct bitmap *swap_table;
 
 #endif /* _ADDRSPACE_H_ */

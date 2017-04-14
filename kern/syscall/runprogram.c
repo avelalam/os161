@@ -82,6 +82,10 @@ runprogram(char *progname)
 	as_activate();
 	
 	init_proc_struct();
+
+	for(int i=0; i<64; i++){
+		curproc->file_table[i]=NULL;
+	}
 	
 	char *con_stdin = kstrdup("con:");
 	file_handle = kmalloc(sizeof(struct fh));
