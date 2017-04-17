@@ -59,6 +59,8 @@ struct pte{
   bool referenced;
 
   struct pte *next;
+  vaddr_t vaddr;
+  paddr_t paddr;
 };
 
 struct segment{
@@ -146,7 +148,9 @@ int               as_prepare_load(struct addrspace *as);
 int               as_complete_load(struct addrspace *as);
 int               as_define_stack(struct addrspace *as, vaddr_t *initstackptr);
 
-void takeppages(paddr_t paddr, int page_type);
+
+struct vnode *disk;
+struct bitmap *swap_table;
 /*
  * Functions in loadelf.c
  *    load_elf - load an ELF user program executable into the current
@@ -155,13 +159,8 @@ void takeppages(paddr_t paddr, int page_type);
  */
 
 int load_elf(struct vnode *v, vaddr_t *entrypoint);
-int write_to_disk(vaddr_t vaddr, int index);
-int read_from_disk(vaddr_t vaddr, int index);
-paddr_t swapout(void);
-paddr_t swapin(vaddr_t vaddr);
 
+paddr_t page_table_add(struct addrspace *as, vaddr_t vaddr);
 
-struct vnode *disk;
-struct bitmap *swap_table;
 
 #endif /* _ADDRSPACE_H_ */

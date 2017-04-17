@@ -582,33 +582,33 @@ int sys_sbrk(intptr_t amount, int *retval){
 
 
 	*retval = heap->vend;
-	int oldend = heap->vend/PAGE_SIZE;
-	int newend = (heap->vend+amount)/PAGE_SIZE;
+	// int oldend = heap->vend/PAGE_SIZE;
+	// int newend = (heap->vend+amount)/PAGE_SIZE;
+	vaddr_t oldend = heap->vend;
+	vaddr_t newend = heap->vend + amount;
 
 	if(amount<0){
 		struct pte *curr = curproc->p_addrspace->page_table;
 		struct pte *prev = NULL;
 	    struct pte *next =NULL;
 	    int i, ehi;
-	    // kprintf("old:%x, new:%x\n", oldend, newend);
 		while(curr!=NULL){
 	        next=curr->next;
-	        if(curr->vpn>=newend && curr->vpn<=oldend){
-	        	// kprintf("removing:%p\n",(void*)curr->vpn);
-	        	ehi = curr->vpn*PAGE_SIZE;
+	        if(curr->vaddr>=newend && curr->vaddr<=oldend){
+	        	ehi = curr->vaddr;
 	        	i = tlb_probe(ehi, 0);
 	        	if(i>0){
 					tlb_write(TLBHI_INVALID(i), TLBLO_INVALID(), i);	        		
 	        	}
 	        	if(prev!=NULL){
 	        		prev->next=curr->next;
-	        		takeppages(curr->ppn*4096,USER);
+	        		takeppages(curr->paddr,USER);
 	        		kfree(curr);
 	        		curr = NULL;
 	        	}
 	        	else if(prev==NULL){
 	        		curproc->p_addrspace->page_table=next;
-	        		takeppages(curr->ppn*4096,USER);
+	        		takeppages(curr->paddr,USER);
 	        		kfree(curr);
 	        		curr = NULL;
 	        	}
