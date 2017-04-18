@@ -267,10 +267,10 @@ void page_table_destroy(struct addrspace *as){
 		currpage = page_table;
 		page_table = page_table->next;
 		if(currpage->state == INMEMORY){
-			takeppages((currpage->ppn)*PAGE_SIZE, USER);
+			free_upage(currpage->paddr);
 		}else{
 			// Clear the slot in the disk
-			bitmap_unmark(swap_table, currpage->ppn);
+			// bitmap_unmark(swap_table, currpage->ppn);
 		}
 		kfree(currpage);
 	}
@@ -425,11 +425,11 @@ paddr_t page_table_add(struct addrspace *as, vaddr_t vaddr){
 	if(new_pte == NULL){
 		return 0;
 	}
-	paddr_t paddr = getppages(1, USER, vaddr);
+	new_pte->vaddr = vaddr&PAGE_FRAME;
+	paddr_t paddr = alloc_upage(new_pte);
 	if(paddr == 0){
 		return 0;
 	}
-	new_pte->vaddr = vaddr&PAGE_FRAME;
 	new_pte->paddr = paddr;
 	new_pte->vpn = VPN(vaddr);
 	new_pte->ppn = paddr/PAGE_SIZE;

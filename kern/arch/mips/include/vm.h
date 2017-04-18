@@ -135,8 +135,8 @@ struct tlbshootdown {
 struct page_entry{
         int page_state;
         size_t chunk_size;
-        struct addrspace *as;
         vaddr_t vaddr;
+        struct pte *pte;
 };
 
 extern struct page_entry *coremap;

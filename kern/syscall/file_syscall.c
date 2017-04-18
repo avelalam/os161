@@ -602,13 +602,13 @@ int sys_sbrk(intptr_t amount, int *retval){
 	        	}
 	        	if(prev!=NULL){
 	        		prev->next=curr->next;
-	        		takeppages(curr->paddr,USER);
+	        		free_upage(curr->paddr);
 	        		kfree(curr);
 	        		curr = NULL;
 	        	}
 	        	else if(prev==NULL){
 	        		curproc->p_addrspace->page_table=next;
-	        		takeppages(curr->paddr,USER);
+	        		free_upage(curr->paddr);
 	        		kfree(curr);
 	        		curr = NULL;
 	        	}

@@ -69,6 +69,7 @@ coremap_init(size_t ramsize){
 			coremap[i].page_state = FREE;
 		}
 		coremap[i].chunk_size = 0;
+		coremap[i].pte = NULL;
 	}
 
 	

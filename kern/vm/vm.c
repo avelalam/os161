@@ -87,7 +87,7 @@ vaddr_t getppages(unsigned npages, int page_type, vaddr_t vaddr){
 		coremap[i].chunk_size = npages;
 		pa = i*PAGE_SIZE;
 		if(page_type == USER){
-			coremap[i].as = proc_getas();
+			// coremap[i].as = proc_getas();
 			coremap[i].vaddr = vaddr;
 		}
 	}else if(disk != NULL){
@@ -143,6 +143,42 @@ free_kpages(vaddr_t vaddr)
 	
 	takeppages(pa, KERNEL);
 	(void)vaddr;
+}
+
+paddr_t alloc_upage(struct pte *pte){
+	
+	paddr_t paddr=0;
+	unsigned i;
+
+	spinlock_acquire(&cm_spinlock);
+	for(i=0; i<num_total_pages; i++){
+		if(coremap[i].page_state == FREE){
+			paddr = i*PAGE_SIZE;
+			coremap[i].page_state = USER;
+			coremap[i].chunk_size = 1;
+			coremap[i].pte = pte;
+			break;
+		}
+	}
+	spinlock_release(&cm_spinlock);
+
+	return paddr;
+}
+
+void free_upage(paddr_t paddr){
+
+	unsigned i = paddr/PAGE_SIZE;
+
+	spinlock_acquire(&cm_spinlock);
+	KASSERT(coremap[i].page_state == USER);
+	KASSERT(coremap[i].chunk_size == 1);
+
+	coremap[i].page_state = FREE;
+	coremap[i].chunk_size = 0;
+	coremap[i].pte = NULL;
+
+	spinlock_release(&cm_spinlock);
+	(void)paddr;
 }
 
 unsigned

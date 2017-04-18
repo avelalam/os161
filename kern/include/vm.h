@@ -27,6 +27,8 @@
  * SUCH DAMAGE.
  */
 
+#include <machine/vm.h>
+
 #ifndef _VM_H_
 #define _VM_H_
 
@@ -37,7 +39,6 @@
  */
 
 
-#include <machine/vm.h>
 
 /* Fault-type arguments to vm_fault() */
 #define VM_FAULT_READ        0    /* A read was attempted */

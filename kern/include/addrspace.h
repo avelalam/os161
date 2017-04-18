@@ -162,5 +162,7 @@ int load_elf(struct vnode *v, vaddr_t *entrypoint);
 
 paddr_t page_table_add(struct addrspace *as, vaddr_t vaddr);
 
+paddr_t alloc_upage(struct pte *pte);
+void free_upage(paddr_t paddr);
 
 #endif /* _ADDRSPACE_H_ */
