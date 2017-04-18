@@ -116,7 +116,7 @@ void takeppages(paddr_t paddr, int page_type){
 		int npages = coremap[i].chunk_size;
 		coremap[i].chunk_size = 0;
 		for(;npages!=0;i++,npages--){
-			memset((void*)PADDR_TO_KVADDR(i*PAGE_SIZE), '\0', PAGE_SIZE);	
+			memset((void*)PADDR_TO_KVADDR(i*PAGE_SIZE), '\0', PAGE_SIZE);
 			coremap[i].page_state = FREE;
 		}
 	}	
@@ -176,6 +176,7 @@ void free_upage(paddr_t paddr){
 	coremap[i].page_state = FREE;
 	coremap[i].chunk_size = 0;
 	coremap[i].pte = NULL;
+	memset((void*)PADDR_TO_KVADDR(paddr), '\0', PAGE_SIZE);
 
 	spinlock_release(&cm_spinlock);
 	(void)paddr;
