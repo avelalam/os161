@@ -52,7 +52,18 @@ vm_bootstrap(void)
 	if(swap_table == NULL){
 		kfree(disk_name);
 		vfs_close(disk);
+		return;
 	}
+
+	bm_lock = lock_create("bm_lock");
+	if(bm_lock == NULL){
+		kfree(disk_name);
+		vfs_close(disk);
+		return;
+	}
+
+	swap_enabled = true;
+
 
 }
 
@@ -65,44 +76,42 @@ vaddr_t getppages(unsigned npages, int page_type, vaddr_t vaddr){
 	paddr_t pa=0;
 	unsigned i=0,count=0;
 
-	spinlock_acquire(&cm_spinlock);
-	for(i=0; i<num_total_pages; i++){
-		if(coremap[i].page_state != FREE){	
-			count = 0;
-			continue;
+	if(swap_enabled != true){
+
+		spinlock_acquire(&cm_spinlock);
+		for(i=0; i<num_total_pages; i++){
+			if(coremap[i].page_state != FREE){	
+				count = 0;
+				continue;
+			}
+			count++;
+			if(count == npages){
+				break;
+			}
 		}
-		count++;
+
 		if(count == npages){
-			break;
+			while(count!=0){
+				coremap[i].page_state = page_type;
+				i--;
+				count--;
+			}
+			i++;
+			coremap[i].chunk_size = npages;
+			pa = i*PAGE_SIZE;
+			if(page_type == USER){
+				// coremap[i].as = proc_getas();
+				coremap[i].vaddr = vaddr;
+			}
 		}
+		
+		spinlock_release(&cm_spinlock);
+		return pa;
+	}else{
+
 	}
 
-	if(count == npages){
-		while(count!=0){
-			coremap[i].page_state = page_type;
-			i--;
-			count--;
-		}
-		i++;
-		coremap[i].chunk_size = npages;
-		pa = i*PAGE_SIZE;
-		if(page_type == USER){
-			// coremap[i].as = proc_getas();
-			coremap[i].vaddr = vaddr;
-		}
-	}else if(disk != NULL){
-		// pa = swapout();
-		// i = pa/PAGE_SIZE;
-		// coremap[i].page_state = page_type;
-		// coremap[i].chunk_size = npages;
-		// if(page_type == USER){
-		// 	coremap[i].as = proc_getas();
-		// 	coremap[i].vaddr = vaddr;
-		// }
-	}
-	
-	spinlock_release(&cm_spinlock);
-	return pa;
+	return 0;
 }
 
 
@@ -150,19 +159,24 @@ paddr_t alloc_upage(struct pte *pte){
 	paddr_t paddr=0;
 	unsigned i;
 
-	spinlock_acquire(&cm_spinlock);
-	for(i=0; i<num_total_pages; i++){
-		if(coremap[i].page_state == FREE){
-			paddr = i*PAGE_SIZE;
-			coremap[i].page_state = USER;
-			coremap[i].chunk_size = 1;
-			coremap[i].pte = pte;
-			break;
+	if(swap_enabled != true){
+		spinlock_acquire(&cm_spinlock);
+		for(i=0; i<num_total_pages; i++){
+			if(coremap[i].page_state == FREE){
+				paddr = i*PAGE_SIZE;
+				coremap[i].page_state = USER;
+				coremap[i].chunk_size = 1;
+				coremap[i].pte = pte;
+				break;
+			}
 		}
-	}
-	spinlock_release(&cm_spinlock);
+		spinlock_release(&cm_spinlock);
+		return paddr;
+	}else{
 
-	return paddr;
+	}
+
+	return 0;
 }
 
 void free_upage(paddr_t paddr){
@@ -236,23 +250,31 @@ paddr_t tlb_fault(vaddr_t faultaddress){
 	vaddr_t vaddr = faultaddress&PAGE_FRAME;
 	paddr_t paddr = 0;
 
-	lock_acquire(curproc->p_addrspace->page_table_lock);
-	while(page_table != NULL){
-		if(page_table->vaddr == vaddr){
-			if(page_table->state == INMEMORY){
-				paddr = page_table->paddr;
-			}else{
-				// ppn = VPN(swapin(faultaddress));
+	if(swap_enabled != true){
+		lock_acquire(curproc->p_addrspace->page_table_lock);
+		while(page_table != NULL){
+			if(page_table->vaddr == vaddr){
+				if(page_table->state == INMEMORY){
+					paddr = page_table->paddr;
+				}else{
+					// ppn = VPN(swapin(faultaddress));
+				}
+				lock_release(curproc->p_addrspace->page_table_lock);
+				return paddr;
 			}
-			lock_release(curproc->p_addrspace->page_table_lock);
-			return paddr;
+			page_table = page_table->next;
 		}
-		page_table = page_table->next;
+		lock_release(curproc->p_addrspace->page_table_lock);
+	}else{
+		
 	}
-	lock_release(curproc->p_addrspace->page_table_lock);
 
-	paddr = page_table_add(curproc->p_addrspace , faultaddress);
-	
+	struct pte *pte = page_table_add(curproc->p_addrspace , faultaddress);
+	if(pte == NULL){
+		return ENOMEM;
+	}
+	paddr = pte->paddr;
+
 	return paddr;
 }
 

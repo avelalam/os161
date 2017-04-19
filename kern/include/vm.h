@@ -38,7 +38,7 @@
  * You'll probably want to add stuff here.
  */
 
-
+bool swap_enabled;
 
 /* Fault-type arguments to vm_fault() */
 #define VM_FAULT_READ        0    /* A read was attempted */

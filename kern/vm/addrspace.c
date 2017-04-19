@@ -96,17 +96,23 @@ as_create(void)
 static
 int page_table_copy(struct addrspace *oldas, struct addrspace *newas){
 
-	struct pte *old = oldas->page_table;
+	if(swap_enabled != true){
+		struct pte *old = oldas->page_table;
 
-	for(;old!=NULL; old = old->next){
+		for(;old!=NULL; old = old->next){
 
-		paddr_t paddr = page_table_add(newas, old->vaddr);
-		if(paddr == 0){
-			return ENOMEM;
+			struct pte *new_pte = page_table_add(newas, old->vaddr);
+			if(new_pte == NULL){
+				return ENOMEM;
+			}
+			memmove((void*)PADDR_TO_KVADDR(new_pte->paddr),
+				(const void*)PADDR_TO_KVADDR(old->paddr),
+				PAGE_SIZE);
 		}
-		memmove((void*)PADDR_TO_KVADDR(paddr),
-			(const void*)PADDR_TO_KVADDR(old->paddr),
-			PAGE_SIZE);
+
+		return 0;
+	}else{
+
 	}
 
 	return 0;
@@ -260,22 +266,26 @@ void segment_table_destroy(struct addrspace *as){
 static
 void page_table_destroy(struct addrspace *as){
 
-	struct pte *page_table = as->page_table;
-	struct pte *currpage;
-	lock_acquire(as->page_table_lock);
-	while(page_table != NULL){
-		currpage = page_table;
-		page_table = page_table->next;
-		if(currpage->state == INMEMORY){
-			free_upage(currpage->paddr);
-		}else{
-			// Clear the slot in the disk
-			// bitmap_unmark(swap_table, currpage->ppn);
+	if(swap_enabled != true){
+		struct pte *page_table = as->page_table;
+		struct pte *currpage;
+		lock_acquire(as->page_table_lock);
+		while(page_table != NULL){
+			currpage = page_table;
+			page_table = page_table->next;
+			if(currpage->state == INMEMORY){
+				free_upage(currpage->paddr);
+			}else{
+				// Clear the slot in the disk
+				// bitmap_unmark(swap_table, currpage->ppn);
+			}
+			kfree(currpage);
 		}
-		kfree(currpage);
+		lock_release(as->page_table_lock);
+		(void)as;
+	}else{
+
 	}
-	lock_release(as->page_table_lock);
-	(void)as;
 }
 
 void
@@ -419,33 +429,39 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 
 /* Add the given page to the page_table*/
 
-paddr_t page_table_add(struct addrspace *as, vaddr_t vaddr){
+struct pte* page_table_add(struct addrspace *as, vaddr_t vaddr){
 
-	struct pte *new_pte = kmalloc(sizeof(struct pte));
-	if(new_pte == NULL){
-		return 0;
-	}
-	new_pte->vaddr = vaddr&PAGE_FRAME;
-	paddr_t paddr = alloc_upage(new_pte);
-	if(paddr == 0){
-		return 0;
-	}
-	new_pte->paddr = paddr;
-	new_pte->vpn = VPN(vaddr);
-	new_pte->ppn = paddr/PAGE_SIZE;
-	new_pte->state = INMEMORY;
-	new_pte->next = NULL;
+	if(swap_enabled != true){
+		struct pte *new_pte = kmalloc(sizeof(struct pte));
+		if(new_pte == NULL){
+			return NULL;
+		}
+		new_pte->vaddr = vaddr&PAGE_FRAME;
+		paddr_t paddr = alloc_upage(new_pte);
+		if(paddr == 0){
+			kfree(new_pte);
+			return NULL;
+		}
+		new_pte->paddr = paddr;
+		new_pte->vpn = VPN(vaddr);
+		new_pte->ppn = paddr/PAGE_SIZE;
+		new_pte->state = INMEMORY;
+		new_pte->next = NULL;
 
-	lock_acquire(as->page_table_lock);
-	if(as->page_table == NULL){
-		as->page_table = new_pte;
+		lock_acquire(as->page_table_lock);
+		if(as->page_table == NULL){
+			as->page_table = new_pte;
+		}else{
+			new_pte->next = as->page_table;
+			as->page_table = new_pte;
+		}
+		lock_release(as->page_table_lock);
+
+		return new_pte;
 	}else{
-		new_pte->next = as->page_table;
-		as->page_table = new_pte;
-	}
-	lock_release(as->page_table_lock);
 
-	return paddr;
+	}
+	return NULL;
 }
 
 

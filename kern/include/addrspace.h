@@ -151,6 +151,8 @@ int               as_define_stack(struct addrspace *as, vaddr_t *initstackptr);
 
 struct vnode *disk;
 struct bitmap *swap_table;
+struct lock *bm_lock;
+
 /*
  * Functions in loadelf.c
  *    load_elf - load an ELF user program executable into the current
@@ -160,7 +162,7 @@ struct bitmap *swap_table;
 
 int load_elf(struct vnode *v, vaddr_t *entrypoint);
 
-paddr_t page_table_add(struct addrspace *as, vaddr_t vaddr);
+struct pte* page_table_add(struct addrspace *as, vaddr_t vaddr);
 
 paddr_t alloc_upage(struct pte *pte);
 void free_upage(paddr_t paddr);
