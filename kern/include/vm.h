@@ -58,13 +58,14 @@ int vm_fault(int faulttype, vaddr_t faultaddress);
 vaddr_t alloc_kpages(unsigned npages);
 void free_kpages(vaddr_t addr);
 
-vaddr_t getppages(unsigned npages, int page_type, vaddr_t vaddr);
+vaddr_t getppages(unsigned npages);
 void takeppages(paddr_t paddr, int page_type);
 
+paddr_t evict_page(void);
 int write_to_disk(vaddr_t vaddr, int index);
 int read_from_disk(vaddr_t vaddr, int index);
-paddr_t swapout(void);
-paddr_t swapin(vaddr_t vaddr);
+void swapout(struct pte *pte);
+paddr_t swapin(struct pte *pte);
 
 void* testret(void* addr);
 /*
@@ -77,4 +78,5 @@ unsigned int coremap_used_bytes(void);
 /* TLB shootdown handling called from interprocessor_interrupt */
 void vm_tlbshootdown(const struct tlbshootdown *);
 
+struct lock *biglock;
 #endif /* _VM_H_ */

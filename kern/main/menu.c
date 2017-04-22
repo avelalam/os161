@@ -146,7 +146,7 @@ common_prog(int nargs, char **args)
 	// Wait for all threads to finish cleanup, otherwise khu be a bit behind,
 	// especially once swapping is enabled.
 	thread_wait_for_count(tc);
-	for(int pid=2; pid<200; pid++){
+	for(int pid=2; pid<PID_MAX; pid++){
 		if(proc_table[pid] != NULL){
 			sys_waitpid(pid, NULL, 0);
 		}

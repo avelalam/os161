@@ -52,23 +52,18 @@ struct vnode;
 #define DISK      1
 
 struct pte{
-  int vpn;
-  int ppn;
   bool state;
-  bool valid;
-  bool referenced;
-
-  struct pte *next;
   vaddr_t vaddr;
   paddr_t paddr;
+  bool referenced;
+  unsigned disk_slot;
+  struct pte *next;
+  struct lock *pte_lock;
 };
 
 struct segment{
   vaddr_t vbase;
   vaddr_t vend;
-  int readable;
-  int writeable;
-  int executable;
   struct segment *next;
 };
 

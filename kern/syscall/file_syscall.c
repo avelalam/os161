@@ -151,7 +151,7 @@ int sys_read(int fd, void* buf, int buflen){
 }
 
 int sys_close(int fd){
-	
+
 	if(fd>63 || fd <0){
 		return EBADF;
 	}
@@ -339,11 +339,14 @@ int sys_fork(struct trapframe *tf){
 	}
 	newproc->ppid = curproc->pid;
 	newproc->exit_status = false;
-	newproc->proc_sem = sem_create("procsec",0);
+	newproc->proc_sem = sem_create("child_sem",0);
+	if(newproc->proc_sem == NULL){
+		return ENOMEM;
+	}
 
 	lock_acquire(pt_lock);	
 		
-	for(pid=3; pid<200; pid++){
+	for(pid=3; pid<PID_MAX; pid++){
 		if(proc_table[pid] == NULL){
 			break;
 		}
@@ -385,12 +388,12 @@ void sys__exit(int exitcode){
 	for(int i=0; i<64; i++){
 		if(curproc->file_table[i] != NULL){
 			sys_close(i);
-		}                                                                                     
+		}
 	}
-	V(curproc->proc_sem);
 	lock_release(pt_lock);
+	V(curproc->proc_sem);
 	thread_exit();
-
+	
 }
 
 int sys_waitpid(int pid, void* status, int options){
@@ -417,7 +420,6 @@ int sys_waitpid(int pid, void* status, int options){
 	if(status != NULL){
 		err = copyout(&child_proc->exitcode, (userptr_t) status, sizeof(int ));
 		if(err){
-			sem_destroy(child_proc->proc_sem);	
 			proc_destroy(child_proc);
 			proc_table[pid] = NULL;
 			return err;
@@ -517,18 +519,6 @@ int sys_execv(char *prog_name,char **args){
 	j=0;
 	*ptrptr = (char*)stackptr;
 
-	// for(int i=argc-1; i>=0;i--){
-	// 	str_len = strlen(&(buffer1[j]));
-	// 	kprintf("in stack:%s\n",(char*)s_ptr);
-	// 	s_ptr += str_len;
-	// 	int nulls = 1+(str_len/4);
-	// 	nulls *= 4;
-	// 	nulls -= str_len;
-	// 	s_ptr += nulls;
-	// 	j+=str_len+1;
-
-	// }
-	// j=0;
 	for(int i=argc-1; i>=0; i--){
 		
 		str_len = strlen(&(buffer1[j]));
@@ -582,8 +572,6 @@ int sys_sbrk(intptr_t amount, int *retval){
 
 
 	*retval = heap->vend;
-	// int oldend = heap->vend/PAGE_SIZE;
-	// int newend = (heap->vend+amount)/PAGE_SIZE;
 	vaddr_t oldend = heap->vend;
 	vaddr_t newend = heap->vend + amount;
 
@@ -592,6 +580,7 @@ int sys_sbrk(intptr_t amount, int *retval){
 		struct pte *prev = NULL;
 	    struct pte *next =NULL;
 	    int i, ehi;
+
 		while(curr!=NULL){
 	        next=curr->next;
 	        if(curr->vaddr>=newend && curr->vaddr<=oldend){
@@ -603,12 +592,14 @@ int sys_sbrk(intptr_t amount, int *retval){
 	        	if(prev!=NULL){
 	        		prev->next=curr->next;
 	        		free_upage(curr->paddr);
+	        		lock_destroy(curr->pte_lock);
 	        		kfree(curr);
 	        		curr = NULL;
 	        	}
 	        	else if(prev==NULL){
 	        		curproc->p_addrspace->page_table=next;
 	        		free_upage(curr->paddr);
+	        		lock_destroy(curr->pte_lock);
 	        		kfree(curr);
 	        		curr = NULL;
 	        	}

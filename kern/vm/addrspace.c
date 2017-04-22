@@ -112,79 +112,63 @@ int page_table_copy(struct addrspace *oldas, struct addrspace *newas){
 
 		return 0;
 	}else{
+		struct pte *old = oldas->page_table;
 
+		for(;old!=NULL; old=old->next){
+			struct pte *new_pte = kmalloc(sizeof(struct pte));
+			new_pte->vaddr = old->vaddr;
+			new_pte->state = DISK;
+			new_pte->pte_lock = lock_create("pte_lock");
+			lock_acquire(bm_lock);
+			int err = bitmap_alloc(swap_table, &new_pte->disk_slot);
+			if(err){
+				return ENOSPC;
+			}
+			lock_release(bm_lock);
+			new_pte->next = NULL;
+			
+			if(old->state == INMEMORY){
+				write_to_disk(PADDR_TO_KVADDR(old->paddr), new_pte->disk_slot);
+			}else{
+				swapin(old);
+				write_to_disk(PADDR_TO_KVADDR(old->paddr), new_pte->disk_slot);
+			}
+
+			if(newas->page_table == NULL){
+				newas->page_table = new_pte;
+			}else{
+				new_pte->next = newas->page_table;
+				newas->page_table = new_pte;
+			}
+		}
+
+		// for(;old!=NULL; old = old->next){
+		// 	struct pte *new_pte = page_table_add(newas, old->vaddr);
+		// 	if(new_pte == NULL){
+		// 		return ENOMEM;
+		// 	}
+		// 	lock_acquire(old->pte_lock);
+		// 	KASSERT(new_pte->state == INMEMORY);
+		// 	if(old->state == INMEMORY){
+		// 		memmove((void*)PADDR_TO_KVADDR(new_pte->paddr),
+		// 					(const void*)PADDR_TO_KVADDR(old->paddr),
+		// 						PAGE_SIZE);
+		// 	}else{
+		// 		lock_acquire(bm_lock);
+		// 		KASSERT(old->state == DISK);
+		// 		read_from_disk(PADDR_TO_KVADDR(new_pte->paddr), old->disk_slot);
+		// 		lock_release(bm_lock);
+		// 	}
+			// KASSERT(coremap[new_pte->paddr/PAGE_SIZE].page_state == DIRTY);
+			// coremap[new_pte->paddr/PAGE_SIZE].page_state = USER;
+			// lock_release(new_pte->pte_lock);
+			// lock_release(old->pte_lock);
+		// }
+		return 0;
 	}
 
 	return 0;
 }
-
-// static
-// int page_table_copy(struct pte *old, struct pte **ret){
-
-// 	struct pte *new = NULL;
-// 	struct pte *prev;
-
-// 	paddr_t paddr;
-// 	new = kmalloc(sizeof(struct pte));
-// 	if(new == NULL){
-// 		return ENOMEM;
-// 	}
-// 	new->vpn = old->vpn;
-// 	new->vaddr = old->vaddr;
-// 	paddr = getppages(1, USER, old->vpn*PAGE_SIZE);
-// 	if(paddr == 0){
-// 		return ENOMEM;
-// 	}
-// 	if(old->state == INMEMORY){
-// 		memmove((void*)PADDR_TO_KVADDR(paddr),
-// 		(const void*)PADDR_TO_KVADDR(old->ppn*PAGE_SIZE),
-// 		PAGE_SIZE);
-// 	}else{
-// 		// Copy data from slot in disk to new page allocated
-// 	}
-// 	new->paddr = paddr;
-// 	new->ppn = paddr/PAGE_SIZE;
-// 	new->state = old->state;
-// 	new->valid = old->valid;
-// 	new->referenced = old->referenced;
-// 	new->next = NULL;
-// 	old = old->next;
-// 	prev = new;
-
-// 	while(old != NULL){
-// 		// kprintf("copying pte:%p\n",(void*)(old->vpn*PAGE_SIZE));
-// 		// kprintf("data:%s\n",(char*)(PADDR_TO_KVADDR(old->ppn*PAGE_SIZE)));
-// 		struct pte *curr = kmalloc(sizeof(struct pte));
-// 		if(curr == NULL){
-// 			return ENOMEM;
-// 		}
-// 		curr->vpn = old->vpn;
-// 		curr->vaddr = old->vaddr;
-// 		paddr = getppages(1, USER, old->vpn*PAGE_SIZE);
-// 		if(paddr == 0){
-// 			return ENOMEM;
-// 		}
-// 		if(old->state == INMEMORY){
-// 			memmove((void*)PADDR_TO_KVADDR(paddr),
-// 				(const void*)PADDR_TO_KVADDR(old->ppn*PAGE_SIZE),
-// 				PAGE_SIZE);
-// 		}else{
-// 			// Copy data from slot in disk to new page allocated
-// 		}
-// 		curr->paddr = paddr;
-// 		curr->ppn = paddr/PAGE_SIZE;
-// 		curr->state = old->state;
-// 		curr->valid = old->valid;
-// 		curr->referenced = old->referenced;
-// 		curr->next = NULL;
-// 		prev->next = curr;
-// 		prev = curr;
-
-// 		old = old->next;
-// 	}
-// 	*ret = new;
-// 	return 0;
-// }
 
 int
 as_copy(struct addrspace *old, struct addrspace **ret)
@@ -199,19 +183,15 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 	/*
 	 * Write this.
 	 */
-
 	struct segment *currseg = old->segment_table;
 
 	vaddr_t vaddr;
 	size_t memsize;
-	int readable, writeable, executable;
+	int readable = 0, writeable = 0, executable = 0;
 	while(currseg != NULL){
 		vaddr = currseg->vbase;
 		memsize = currseg->vend - currseg->vbase;
-		readable = currseg->readable;
-		writeable = currseg->writeable;
-		executable = currseg->executable;
-
+		
 		as_define_region(newas, vaddr, memsize, 
 					readable, writeable, executable);
 
@@ -221,16 +201,11 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 	currseg = old->heap;
 	newas->heap->vbase = currseg->vbase;
 	newas->heap->vend = currseg->vend;
-	newas->heap->readable = currseg->readable;
-	newas->heap->writeable = currseg->writeable;
-	newas->heap->executable = currseg->executable;
+	
 
 	currseg = old->stack;
 	newas->stack->vbase = currseg->vbase;
 	newas->stack->vend = currseg->vend;
-	newas->stack->readable = currseg->readable;
-	newas->stack->writeable = currseg->writeable;
-	newas->stack->executable = currseg->executable;
 
 	// int err = page_table_copy(old->page_table, &newas->page_table);
 	// if(err){
@@ -266,26 +241,23 @@ void segment_table_destroy(struct addrspace *as){
 static
 void page_table_destroy(struct addrspace *as){
 
-	if(swap_enabled != true){
-		struct pte *page_table = as->page_table;
-		struct pte *currpage;
-		lock_acquire(as->page_table_lock);
-		while(page_table != NULL){
-			currpage = page_table;
-			page_table = page_table->next;
-			if(currpage->state == INMEMORY){
-				free_upage(currpage->paddr);
-			}else{
-				// Clear the slot in the disk
-				// bitmap_unmark(swap_table, currpage->ppn);
-			}
-			kfree(currpage);
+	struct pte *page_table = as->page_table;
+	struct pte *currpage;
+	while(page_table != NULL){
+		currpage = page_table;
+		page_table = page_table->next;
+		if(currpage->state == INMEMORY){
+			free_upage(currpage->paddr);
+		}else{
+			// Clear the slot in the disk
+			lock_acquire(bm_lock);
+			bitmap_unmark(swap_table, currpage->disk_slot);
+			lock_release(bm_lock);
 		}
-		lock_release(as->page_table_lock);
-		(void)as;
-	}else{
-
+		lock_destroy(currpage->pte_lock);
+		kfree(currpage);
 	}
+	(void)as;
 }
 
 void
@@ -427,38 +399,84 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 }
 
 
-/* Add the given page to the page_table*/
+/* Create new PTE for given vaddr and  
+add it to the given process page_table*/
 
 struct pte* page_table_add(struct addrspace *as, vaddr_t vaddr){
 
 	if(swap_enabled != true){
 		struct pte *new_pte = kmalloc(sizeof(struct pte));
 		if(new_pte == NULL){
+			// kprintf("pte is null\n");
 			return NULL;
 		}
 		new_pte->vaddr = vaddr&PAGE_FRAME;
 		paddr_t paddr = alloc_upage(new_pte);
 		if(paddr == 0){
 			kfree(new_pte);
+			// kprintf("alloc_upage returned 0");
 			return NULL;
 		}
 		new_pte->paddr = paddr;
-		new_pte->vpn = VPN(vaddr);
-		new_pte->ppn = paddr/PAGE_SIZE;
+		// new_pte->vpn = VPN(vaddr);
+		// new_pte->ppn = paddr/PAGE_SIZE;
 		new_pte->state = INMEMORY;
 		new_pte->next = NULL;
+		new_pte->pte_lock = lock_create("pte_lock");
+		if(new_pte->pte_lock == NULL){
+			kfree(new_pte);
+			return NULL;
+		}
 
-		lock_acquire(as->page_table_lock);
 		if(as->page_table == NULL){
 			as->page_table = new_pte;
 		}else{
 			new_pte->next = as->page_table;
 			as->page_table = new_pte;
 		}
-		lock_release(as->page_table_lock);
 
 		return new_pte;
 	}else{
+		struct pte *new_pte = kmalloc(sizeof(struct pte));
+		if(new_pte == NULL){
+			// kprintf("pte is null\n");
+			return NULL;
+		}
+		new_pte->vaddr = vaddr&PAGE_FRAME;
+		// new_pte->vpn = VPN(vaddr);
+		new_pte->state = INMEMORY;
+		new_pte->next = NULL;
+		new_pte->pte_lock = lock_create("pte_lock");
+		if(new_pte->pte_lock == NULL){
+			kfree(new_pte);
+			kprintf("error creating lock\n");
+			return NULL;
+		}
+		
+		unsigned disk_slot;
+		lock_acquire(bm_lock);
+		int err = bitmap_alloc(swap_table, &disk_slot);
+		lock_release(bm_lock);
+		if(err){
+			kprintf("bitmap error\n");
+			return NULL;
+		}
+		new_pte->disk_slot = disk_slot;
+
+		paddr_t paddr = alloc_upage(new_pte);
+		if(paddr == 0){
+			kprintf("alloc_upage returned 0");
+			return NULL;
+		}
+		new_pte->paddr = paddr;
+		// new_pte->ppn = paddr/PAGE_SIZE;
+		if(as->page_table == NULL){
+			as->page_table = new_pte;
+		}else{
+			new_pte->next = as->page_table;
+			as->page_table = new_pte;
+		}
+		return new_pte;
 
 	}
 	return NULL;

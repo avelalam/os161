@@ -84,12 +84,12 @@
 #define USERSTACK     USERSPACETOP
 
 /* Page states */
-#define USER   1
+#define USER   	1
 #define FREE    2
 #define DIRTY   3
 #define CLEAN   4
 #define KERNEL  5
-
+#define VICTIM	6
 /*
  * Interface to the low-level module that looks after the amount of
  * physical memory we have.

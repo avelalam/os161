@@ -85,6 +85,7 @@ proc_create(const char *name)
 	proc->p_cwd = NULL;
         proc->next_fd=3;	
 	
+	proc->proc_sem = NULL;
 	return proc;
 }
 
@@ -168,9 +169,8 @@ proc_destroy(struct proc *proc)
 		as_destroy(as);
 	}
 
-	KASSERT(proc->p_numthreads == 0);
+	// KASSERT(proc->p_numthreads == 0);
 	spinlock_cleanup(&proc->p_lock);
-
 	kfree(proc->p_name);
 	kfree(proc);
 }
@@ -269,12 +269,13 @@ proc_remthread(struct thread *t)
 	int spl;
 
 	proc = t->t_proc;
-	KASSERT(proc != NULL);
+	(void)proc;
+	// KASSERT(proc != NULL);
 
-	spinlock_acquire(&proc->p_lock);
-	KASSERT(proc->p_numthreads > 0);
-	proc->p_numthreads--;
-	spinlock_release(&proc->p_lock);
+	// spinlock_acquire(&proc->p_lock);
+	// KASSERT(proc->p_numthreads > 0);
+	// proc->p_numthreads--;
+	// spinlock_release(&proc->p_lock);
 
 	spl = splhigh();
 	t->t_proc = NULL;

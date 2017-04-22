@@ -37,6 +37,7 @@
  */
 
 #include <spinlock.h>
+#include <limits.h>
 
 struct addrspace;
 struct thread;
@@ -98,7 +99,7 @@ struct proc {
 };
 
 
-struct proc *proc_table[200];
+struct proc *proc_table[PID_MAX];
 struct lock *pt_lock;
 
 

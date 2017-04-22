@@ -54,7 +54,7 @@ vm_bootstrap(void)
 		vfs_close(disk);
 		return;
 	}
-
+	kprintf("bitmap slots:%d for disk:%d\n",nbits, disk_size);
 	bm_lock = lock_create("bm_lock");
 	if(bm_lock == NULL){
 		kfree(disk_name);
@@ -62,20 +62,21 @@ vm_bootstrap(void)
 		return;
 	}
 
+	biglock = lock_create("biglock");
+	if(bm_lock == NULL){
+		lock_destroy(bm_lock);
+		kfree(disk_name);
+		vfs_close(disk);
+		return;
+	}
 	swap_enabled = true;
-
 
 }
 
-
-
-
-
-vaddr_t getppages(unsigned npages, int page_type, vaddr_t vaddr){
+vaddr_t getppages(unsigned npages){
 
 	paddr_t pa=0;
 	unsigned i=0,count=0;
-
 	if(swap_enabled != true){
 
 		spinlock_acquire(&cm_spinlock);
@@ -92,23 +93,53 @@ vaddr_t getppages(unsigned npages, int page_type, vaddr_t vaddr){
 
 		if(count == npages){
 			while(count!=0){
-				coremap[i].page_state = page_type;
+				coremap[i].page_state = KERNEL;
 				i--;
 				count--;
 			}
 			i++;
 			coremap[i].chunk_size = npages;
 			pa = i*PAGE_SIZE;
-			if(page_type == USER){
-				// coremap[i].as = proc_getas();
-				coremap[i].vaddr = vaddr;
-			}
 		}
 		
 		spinlock_release(&cm_spinlock);
 		return pa;
 	}else{
+		spinlock_acquire(&cm_spinlock);
+		for(i=0; i<num_total_pages; i++){
+			if(coremap[i].page_state != FREE){	
+				count = 0;
+				continue;
+			}
+			count++;
+			if(count == npages){
+				break;
+			}
+		}
 
+		if(count == npages){
+			while(count!=0){
+				coremap[i].page_state = KERNEL;
+				i--;
+				count--;
+			}
+			i++;
+			coremap[i].chunk_size = npages;
+			pa = i*PAGE_SIZE;
+			spinlock_release(&cm_spinlock);
+			return pa;
+		}
+		KASSERT(disk != NULL);
+		KASSERT(npages == 1);
+		pa = evict_page();
+		i = pa/PAGE_SIZE;
+		coremap[i].chunk_size = 1;
+		struct pte *swap_pte = coremap[i].pte;
+		coremap[i].pte = NULL;
+		spinlock_release(&cm_spinlock);
+		swapout(swap_pte);
+		coremap[i].page_state = KERNEL;
+		return pa;
 	}
 
 	return 0;
@@ -136,12 +167,11 @@ vaddr_t alloc_kpages(unsigned npages)
 {
 	paddr_t pa;
 	
-	pa = getppages(npages, KERNEL, 0);
+	pa = getppages(npages);
 	if(pa == 0){
 		return 0;
 	}
 	return PADDR_TO_KVADDR(pa);
-	
 }
 
 void
@@ -173,7 +203,29 @@ paddr_t alloc_upage(struct pte *pte){
 		spinlock_release(&cm_spinlock);
 		return paddr;
 	}else{
+		KASSERT(disk != NULL);
+		spinlock_acquire(&cm_spinlock);
+		for(i=0; i<num_total_pages; i++){
+			if(coremap[i].page_state == FREE){
+				paddr = i*PAGE_SIZE;
+				coremap[i].page_state = USER;
+				coremap[i].chunk_size = 1;
+				coremap[i].pte = pte;
+				spinlock_release(&cm_spinlock);
+				return paddr;
+			}
+		}
 
+		KASSERT(disk != NULL);
+		paddr = evict_page();
+		i = paddr/PAGE_SIZE;
+		KASSERT(coremap[i].pte != NULL);
+		struct pte *swap_pte = coremap[i].pte;
+		coremap[i].chunk_size = 1;
+		coremap[i].pte = pte;
+		spinlock_release(&cm_spinlock);
+		swapout(swap_pte);
+		return paddr;
 	}
 
 	return 0;
@@ -244,14 +296,13 @@ void tlb_update(vaddr_t faultaddress, paddr_t paddr){
 }
 
 static
-paddr_t tlb_fault(vaddr_t faultaddress){
+struct pte* tlb_fault(vaddr_t faultaddress){
 
 	struct pte *page_table = curproc->p_addrspace->page_table;
 	vaddr_t vaddr = faultaddress&PAGE_FRAME;
 	paddr_t paddr = 0;
 
 	if(swap_enabled != true){
-		lock_acquire(curproc->p_addrspace->page_table_lock);
 		while(page_table != NULL){
 			if(page_table->vaddr == vaddr){
 				if(page_table->state == INMEMORY){
@@ -259,23 +310,38 @@ paddr_t tlb_fault(vaddr_t faultaddress){
 				}else{
 					// ppn = VPN(swapin(faultaddress));
 				}
-				lock_release(curproc->p_addrspace->page_table_lock);
-				return paddr;
+				return page_table;
 			}
 			page_table = page_table->next;
 		}
-		lock_release(curproc->p_addrspace->page_table_lock);
 	}else{
-		
+		while(page_table != NULL){
+			if(page_table->vaddr == vaddr){
+				if(page_table->state == INMEMORY){
+					paddr = page_table->paddr;
+				}else{
+					KASSERT(swap_enabled == true);
+					paddr = swapin(page_table);
+				}
+				return page_table;
+			}
+			page_table = page_table->next;
+		}
 	}
 
 	struct pte *pte = page_table_add(curproc->p_addrspace , faultaddress);
 	if(pte == NULL){
-		return ENOMEM;
+		// kprintf("faultaddress: here%d\n",faultaddress);
+		return NULL;
 	}
 	paddr = pte->paddr;
-
-	return paddr;
+	if(paddr == 0){
+		// kprintf("faultaddress: returning final%d\n",faultaddress);
+		return NULL;
+	}
+	// KASSERT(coremap[pte->paddr/PAGE_SIZE].page_state == DIRTY);
+	// coremap[pte->paddr/PAGE_SIZE].page_state = USER;
+	return pte;
 }
 
 static 
@@ -312,6 +378,7 @@ int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
 
+
 (void)faulttype;
 (void)faultaddress;
 
@@ -321,20 +388,15 @@ if(!valid(faultaddress)){
 	return EFAULT;
 }
 
-paddr_t paddr;
-
-paddr = tlb_fault(faultaddress);
-if(paddr == 0){
+struct pte *pte;
+pte = tlb_fault(faultaddress);
+if(pte == NULL){
+	// panic("Fault addr %p\n",(void*)faultaddress);
 	return ENOMEM;
 }
 // kprintf("pddr:%p\n", (void*)paddr);
 
-/* make sure it's page-aligned */
-KASSERT((paddr & PAGE_FRAME) == paddr);
-
-tlb_update(faultaddress, paddr);
-
-
+tlb_update(faultaddress, pte->paddr);
 
 return 0;
 }
