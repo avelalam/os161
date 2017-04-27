@@ -236,6 +236,7 @@ paddr_t alloc_upage(struct pte *pte){
 		coremap[i].pte = pte;
 		spinlock_release(&cm_spinlock);
 		swapout(swap_pte);
+		memset((void*)PADDR_TO_KVADDR(paddr), '\0', PAGE_SIZE);
 		return paddr;
 	}
 
