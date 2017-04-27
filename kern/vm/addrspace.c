@@ -284,31 +284,31 @@ void page_table_destroy(struct addrspace *as){
 			kfree(currpage);
 		}
 	}else{
-		// struct pte *page_table = as->page_table;
-		// struct pte *currpage;
-		// while(page_table != NULL){
-		// 	currpage = page_table;
-		// 	page_table = page_table->next;
-		// 	lock_acquire(currpage->pte_lock);
-		// 	if(currpage->state == INMEMORY){
-		// 		spinlock_acquire(&cm_spinlock);
-		// 		if(coremap[currpage->paddr/PAGE_SIZE].page_state == USER){
-		// 			free_upage(currpage->paddr);
-		// 		}else if(coremap[currpage->paddr/PAGE_SIZE].page_state == VICTIM){
-		// 			currpage->state = 	DESTROY;
-		// 			spinlock_release(&cm_spinlock);
-		// 			lock_release(currpage->pte_lock);
-		// 			continue;
-		// 		}
-		// 	}else{
-		// 		lock_acquire(bm_lock);
-		// 		bitmap_unmark(swap_table, currpage->disk_slot);
-		// 		lock_release(bm_lock);
-		// 	}
-		// 	lock_release(currpage->pte_lock);
-		// 	lock_destroy(currpage->pte_lock);
-		// 	kfree(currpage);
-		// }
+		struct pte *page_table = as->page_table;
+		struct pte *currpage;
+		while(page_table != NULL){
+			currpage = page_table;
+			page_table = page_table->next;
+			lock_acquire(currpage->pte_lock);
+			if(currpage->state == INMEMORY){
+				spinlock_acquire(&cm_spinlock);
+				if(coremap[currpage->paddr/PAGE_SIZE].page_state == USER){
+					free_upage(currpage->paddr);
+				}else if(coremap[currpage->paddr/PAGE_SIZE].page_state == VICTIM){
+					currpage->state = 	DESTROY;
+					spinlock_release(&cm_spinlock);
+					lock_release(currpage->pte_lock);
+					continue;
+				}
+			}else{
+				lock_acquire(bm_lock);
+				bitmap_unmark(swap_table, currpage->disk_slot);
+				lock_release(bm_lock);
+			}
+			lock_release(currpage->pte_lock);
+			lock_destroy(currpage->pte_lock);
+			kfree(currpage);
+		}
 	}
 	(void)as;
 }
