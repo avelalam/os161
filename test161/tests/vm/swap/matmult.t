@@ -10,7 +10,7 @@ sys161:
   disk1:
     enabled: true
 monitor:
-  commandtimeout: 70.0
+  commandtimeout: 90.0
   window: 40
 misc:
   prompttimeout: 3600.0

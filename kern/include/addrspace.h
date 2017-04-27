@@ -50,6 +50,7 @@ struct vnode;
 
 #define INMEMORY  0
 #define DISK      1
+#define DESTROY   2
 
 struct pte{
   bool state;

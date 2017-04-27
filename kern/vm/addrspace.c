@@ -28,6 +28,7 @@
  */
 
 #include <types.h>
+#include <cpu.h>
 #include <kern/errno.h>
 #include <lib.h>
 #include <addrspace.h>
@@ -52,6 +53,8 @@
  * assignment, this file is not compiled or linked or in any way
  * used. The cheesy hack versions in dumbvm.c are used instead.
  */
+
+struct spinlock cm_spinlock;
 
 struct addrspace *
 as_create(void)
@@ -127,12 +130,34 @@ int page_table_copy(struct addrspace *oldas, struct addrspace *newas){
 			lock_release(bm_lock);
 			new_pte->next = NULL;
 			
+			lock_acquire(old->pte_lock);
 			if(old->state == INMEMORY){
 				write_to_disk(PADDR_TO_KVADDR(old->paddr), new_pte->disk_slot);
 			}else{
 				swapin(old);
 				write_to_disk(PADDR_TO_KVADDR(old->paddr), new_pte->disk_slot);
+				KASSERT(coremap[old->paddr/PAGE_SIZE].page_state == VICTIM);
+				coremap[old->paddr/PAGE_SIZE].page_state = USER;
+
 			}
+			lock_release(old->pte_lock);
+
+			
+			// struct pte *new_pte = page_table_add(newas, old->vaddr);
+			// if(new_pte == NULL){
+			// 	return ENOMEM;
+			// }			
+			// lock_acquire(old->pte_lock);
+			// if(old->state == INMEMORY){
+			// 	memmove((void*)PADDR_TO_KVADDR(new_pte->paddr),
+			// 				(const void*)PADDR_TO_KVADDR(old->paddr),
+			// 					PAGE_SIZE);
+			// }else{
+			// 	read_from_disk(PADDR_TO_KVADDR(new_pte->paddr),old->disk_slot);
+			// }
+			// lock_release(old->pte_lock);
+			// KASSERT(coremap[new_pte->paddr/PAGE_SIZE].page_state == VICTIM);
+			// coremap[new_pte->paddr/PAGE_SIZE].page_state = USER;
 
 			if(newas->page_table == NULL){
 				newas->page_table = new_pte;
@@ -241,21 +266,49 @@ void segment_table_destroy(struct addrspace *as){
 static
 void page_table_destroy(struct addrspace *as){
 
-	struct pte *page_table = as->page_table;
-	struct pte *currpage;
-	while(page_table != NULL){
-		currpage = page_table;
-		page_table = page_table->next;
-		if(currpage->state == INMEMORY){
-			free_upage(currpage->paddr);
-		}else{
-			// Clear the slot in the disk
-			lock_acquire(bm_lock);
-			bitmap_unmark(swap_table, currpage->disk_slot);
-			lock_release(bm_lock);
+	if(swap_enabled != true){
+		struct pte *page_table = as->page_table;
+		struct pte *currpage;
+		while(page_table != NULL){
+			currpage = page_table;
+			page_table = page_table->next;
+			if(currpage->state == INMEMORY){
+				free_upage(currpage->paddr);
+			}else{
+				// Clear the slot in the disk
+				lock_acquire(bm_lock);
+				bitmap_unmark(swap_table, currpage->disk_slot);
+				lock_release(bm_lock);
+			}
+			lock_destroy(currpage->pte_lock);
+			kfree(currpage);
 		}
-		lock_destroy(currpage->pte_lock);
-		kfree(currpage);
+	}else{
+		struct pte *page_table = as->page_table;
+		struct pte *currpage;
+		while(page_table != NULL){
+			currpage = page_table;
+			page_table = page_table->next;
+			lock_acquire(currpage->pte_lock);
+			if(currpage->state == INMEMORY){
+				spinlock_acquire(&cm_spinlock);
+				if(coremap[currpage->paddr/PAGE_SIZE].page_state == USER){
+					free_upage(currpage->paddr);
+				}else if(coremap[currpage->paddr/PAGE_SIZE].page_state == VICTIM){
+					currpage->state = 	DESTROY;
+					spinlock_release(&cm_spinlock);
+					lock_release(currpage->pte_lock);
+					continue;
+				}
+			}else{
+				lock_acquire(bm_lock);
+				bitmap_unmark(swap_table, currpage->disk_slot);
+				lock_release(bm_lock);
+			}
+			lock_release(currpage->pte_lock);
+			lock_destroy(currpage->pte_lock);
+			kfree(currpage);
+		}
 	}
 	(void)as;
 }

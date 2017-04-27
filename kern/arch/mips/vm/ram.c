@@ -44,6 +44,8 @@ static paddr_t lastpaddr;   /* one past end of last free physical page */
  */
 
 unsigned num_total_pages;
+unsigned num_free_pages;
+
 struct page_entry *coremap;
 struct spinlock cm_spinlock;
 static void 
@@ -56,12 +58,19 @@ coremap_init(size_t ramsize){
 	num_total_pages = ramsize/PAGE_SIZE;
 	num_kernel_pages = (firstfree - MIPS_KSEG0)/PAGE_SIZE;	
 	num_coremap_pages = num_total_pages*sizeof(struct page_entry)/PAGE_SIZE;
+	if(num_total_pages*sizeof(struct page_entry)%PAGE_SIZE != 0){
+		num_coremap_pages++;
+	}
 
 	coremap = (struct page_entry*)firstfree;
 	firstfree += num_coremap_pages;	
 	num_kernel_pages += num_coremap_pages;
+	num_free_pages = num_total_pages - num_kernel_pages;
 
 	kprintf("total:%d\n",num_total_pages);
+	kprintf("kernel:%d\n", num_kernel_pages);
+	kprintf("free:%d\n",num_free_pages);
+
 	for(i=0; i< num_total_pages; i++){
 		if(i<num_kernel_pages){
 			coremap[i].page_state = KERNEL;

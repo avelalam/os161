@@ -18,19 +18,21 @@
 #include <kern/time.h>
 #include <clock.h>
 
+unsigned r;
+
 paddr_t evict_page(void){
 
-	int r;
-	struct timespec time_;
+	// unsigned r;
+	// struct timespec time_;
 
-	gettime(&time_);
-	r = time_.tv_nsec % num_total_pages;
+	// gettime(&time_);
+	// r = time_.tv_nsec % num_total_pages;
 	for(unsigned i = 0; i<num_total_pages; i++){
+		r = (r+1)%num_total_pages;
 		if(coremap[r].page_state == USER){
-			// coremap[r].page_state = VICTIM;
+			coremap[r].page_state = VICTIM;
 			return r*PAGE_SIZE;
 		}
-		r = (r+1)%num_total_pages;
 	}
 
 	for(unsigned i=0; i<num_total_pages; i++){
@@ -69,7 +71,10 @@ void swapout(struct pte *pte){
 	write_to_disk(PADDR_TO_KVADDR(paddr), pte->disk_slot);
 	pte->state = DISK;
 	lock_release(pte->pte_lock);
-	
+	if(pte->state == DESTROY){
+		lock_destroy(pte->pte_lock);
+		kfree(pte);
+	}
 }
 
 paddr_t swapin(struct pte *pte){

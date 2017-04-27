@@ -38,6 +38,7 @@
  * You'll probably want to add stuff here.
  */
 
+extern unsigned r;
 bool swap_enabled;
 
 /* Fault-type arguments to vm_fault() */

@@ -89,6 +89,7 @@ struct cpu {
 	unsigned c_numshootdown;
 	struct spinlock c_ipi_lock;
 
+	unsigned tlb_index;
 	/*
 	 * Accessed by other cpus. Protected inside hangman.c.
 	 */
