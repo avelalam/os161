@@ -71,10 +71,10 @@ void swapout(struct pte *pte){
 	write_to_disk(PADDR_TO_KVADDR(paddr), pte->disk_slot);
 	pte->state = DISK;
 	lock_release(pte->pte_lock);
-	if(pte->state == DESTROY){
-		lock_destroy(pte->pte_lock);
-		kfree(pte);
-	}
+	// if(pte->state == DESTROY){
+	// 	lock_destroy(pte->pte_lock);
+	// 	kfree(pte);
+	// }
 }
 
 paddr_t swapin(struct pte *pte){
