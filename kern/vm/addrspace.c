@@ -269,14 +269,17 @@ void page_table_destroy(struct addrspace *as){
 			page_table = page_table->next;
 			lock_acquire(currpage->pte_lock);
 			if(currpage->state == INMEMORY){
-				spinlock_acquire(&cm_spinlock);
-				if(coremap[currpage->paddr/PAGE_SIZE].page_state == USER){
-					free_upage(currpage->paddr);
-				}else if(coremap[currpage->paddr/PAGE_SIZE].page_state == VICTIM){
+				// spinlock_acquire(&cm_spinlock);
+				// if(coremap[currpage->paddr/PAGE_SIZE].page_state == USER){
+				// 	free_upage(currpage->paddr);
+				// }else 
+				if(coremap[currpage->paddr/PAGE_SIZE].page_state == VICTIM){
 					currpage->state = DESTROY;
-					spinlock_release(&cm_spinlock);
+					// spinlock_release(&cm_spinlock);
 					lock_release(currpage->pte_lock);
 					continue;
+				}else{
+					free_upage(currpage->paddr);
 				}
 			}else{
 				lock_acquire(bm_lock);

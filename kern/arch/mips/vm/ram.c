@@ -44,6 +44,7 @@ static paddr_t lastpaddr;   /* one past end of last free physical page */
  */
 
 unsigned num_total_pages;
+unsigned num_kernel_pages;
 unsigned num_free_pages;
 
 struct page_entry *coremap;
@@ -51,7 +52,7 @@ struct spinlock cm_spinlock;
 static void 
 coremap_init(size_t ramsize){
 	unsigned i;
-	unsigned num_kernel_pages,num_coremap_pages;
+	unsigned num_coremap_pages;
 
 	spinlock_init(&cm_spinlock);
 	

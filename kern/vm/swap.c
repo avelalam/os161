@@ -19,6 +19,7 @@
 #include <clock.h>
 
 unsigned r;
+unsigned num_kernel_pages;
 
 // paddr_t evict_page(void){
 
@@ -37,13 +38,16 @@ unsigned r;
 // }
 
 paddr_t evict_page(void){
-
+	
 	while(1){
-		r = (r+1)%num_total_pages;
+		r++;
+		if(r == num_total_pages){
+			r = num_kernel_pages;
+		}
 		if(coremap[r].page_state == USER){
 			if(coremap[r].ref == true){
 				coremap[r].ref = false;
-			}else if(coremap[r].ref == false){
+			}else{
 				coremap[r].page_state = VICTIM;
 				return r*PAGE_SIZE;
 			}
@@ -56,7 +60,6 @@ void swapout(struct pte *pte){
 
 	paddr_t paddr = pte->paddr;
 
-	lock_acquire(pte->pte_lock);
 	int spl;
 	spl = splhigh();
 	int i = tlb_probe(pte->vaddr, 0);
@@ -70,8 +73,9 @@ void swapout(struct pte *pte){
 		kfree(pte);
 		return;
 	}
-	KASSERT(bitmap_isset(swap_table, pte->disk_slot) > 0);
-
+	// KASSERT(bitmap_isset(swap_table, pte->disk_slot) > 0);
+	
+	lock_acquire(pte->pte_lock);
 	write_to_disk(PADDR_TO_KVADDR(paddr), pte->disk_slot);
 	pte->state = DISK;
 	lock_release(pte->pte_lock);

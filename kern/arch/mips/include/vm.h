@@ -141,6 +141,8 @@ struct page_entry{
 
 extern struct page_entry *coremap;
 extern unsigned num_total_pages;
+extern unsigned num_kernel_pages;
 extern unsigned num_free_pages;
+
 extern struct spinlock cm_spinlock;
 #endif /* _MIPS_VM_H_ */

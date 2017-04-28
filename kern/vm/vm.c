@@ -22,6 +22,7 @@
 struct spinlock cm_spinlock;
 
 unsigned num_total_pages;
+unsigned num_kernel_pages;
 unsigned num_free_pages;
 struct page_entry *coremap;
 unsigned r;
@@ -34,7 +35,7 @@ vm_bootstrap(void)
 	/* Do nothing. */
 	// Not checking for error
 
-	r=0;
+	r=num_kernel_pages;
 	char *disk_name = kstrdup("lhd0raw:");
 	int err = vfs_open(disk_name, O_RDWR, 0, &disk);
 	if(err){
@@ -146,6 +147,7 @@ vaddr_t getppages(unsigned npages){
 		coremap[i].pte = NULL;
 		spinlock_release(&cm_spinlock);
 		swapout(swap_pte);
+		memset((void*)PADDR_TO_KVADDR(pa), '\0', PAGE_SIZE);
 		coremap[i].page_state = KERNEL;
 		return pa;
 	}
@@ -257,6 +259,7 @@ void free_upage(paddr_t paddr){
 	coremap[i].page_state = FREE;
 	coremap[i].chunk_size = 0;
 	coremap[i].pte = NULL;
+	coremap[i].ref = false;
 	memset((void*)PADDR_TO_KVADDR(paddr), '\0', PAGE_SIZE);
 
 	spinlock_release(&cm_spinlock);
@@ -297,15 +300,29 @@ void tlb_update(vaddr_t faultaddress, paddr_t paddr){
 	/* Disable interrupts on this CPU while frobbing the TLB. */
 	spl = splhigh();
  	
- 	ehi = faultaddress;
-	elo = paddr | TLBLO_VALID | TLBLO_DIRTY | TLBLO_GLOBAL;
+ 	
 	
-	i = tlb_probe(faultaddress, 0);
-	if(i<0){
-		tlb_random(ehi,elo);
-	}else{
-		tlb_write(ehi,elo, i);
+	// i = tlb_probe(faultaddress, 0);
+	// if(i<0){
+		// tlb_random(ehi,elo);
+	for (i=0; i<NUM_TLB; i++) {
+		tlb_read(&ehi, &elo, i);
+		if (elo & TLBLO_VALID) {
+			continue;
+		}
+		ehi = faultaddress;
+		elo = paddr | TLBLO_DIRTY | TLBLO_VALID | TLBLO_GLOBAL;
+		//DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
+		tlb_write(ehi, elo, i);
+		splx(spl);
+		return;
 	}
+	// }else{
+	// 	tlb_write(ehi,elo, i);
+	// }
+	ehi = faultaddress;
+	elo = paddr | TLBLO_VALID | TLBLO_DIRTY | TLBLO_GLOBAL;
+	tlb_random(ehi ,elo);
 
 	splx(spl);
 }
@@ -335,8 +352,8 @@ struct pte* tlb_fault(vaddr_t faultaddress){
 				lock_acquire(page_table->pte_lock);
 				if(page_table->state == INMEMORY){
 					paddr = page_table->paddr;
-					coremap[page_table->paddr/PAGE_SIZE].ref = true;
 					tlb_update(faultaddress, paddr);
+					coremap[page_table->paddr/PAGE_SIZE].ref = true;
 				}else{
 					KASSERT(swap_enabled == true);
 					paddr = swapin(page_table);
@@ -362,6 +379,7 @@ struct pte* tlb_fault(vaddr_t faultaddress){
 	}
 	if(swap_enabled == true){
 		tlb_update(faultaddress, paddr);
+		coremap[pte->paddr/PAGE_SIZE].ref = true;
 		KASSERT(coremap[pte->paddr/PAGE_SIZE].page_state == VICTIM);
 		coremap[pte->paddr/PAGE_SIZE].page_state = USER;
 	}
