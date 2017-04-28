@@ -119,52 +119,52 @@ int page_table_copy(struct addrspace *oldas, struct addrspace *newas){
 
 		for(;old!=NULL; old=old->next){
 
-			// struct pte *new_pte = page_table_add(newas, old->vaddr);
-			// if(new_pte == NULL){
-			// 	return ENOMEM;
-			// }			
-			// lock_acquire(old->pte_lock);
-			// if(old->state == INMEMORY){
-			// 	memmove((void*)PADDR_TO_KVADDR(new_pte->paddr),
-			// 				(const void*)PADDR_TO_KVADDR(old->paddr),
-			// 					PAGE_SIZE);
-			// }else{
-			// 	read_from_disk(PADDR_TO_KVADDR(new_pte->paddr),old->disk_slot);
-			// }
-			// lock_release(old->pte_lock);
-			// KASSERT(coremap[new_pte->paddr/PAGE_SIZE].page_state == VICTIM);
-			// coremap[new_pte->paddr/PAGE_SIZE].page_state = USER;
-
-			struct pte *new_pte = kmalloc(sizeof(struct pte));
-			new_pte->vaddr = old->vaddr;
-			new_pte->state = DISK;
-			new_pte->pte_lock = lock_create("pte_lock");
-			lock_acquire(bm_lock);
-			int err = bitmap_alloc(swap_table, &new_pte->disk_slot);
-			if(err){
-				return ENOSPC;
-			}
-			lock_release(bm_lock);
-			new_pte->next = NULL;
-			
+			struct pte *new_pte = page_table_add(newas, old->vaddr);
+			if(new_pte == NULL){
+				return ENOMEM;
+			}			
 			lock_acquire(old->pte_lock);
 			if(old->state == INMEMORY){
-				write_to_disk(PADDR_TO_KVADDR(old->paddr), new_pte->disk_slot);
+				memmove((void*)PADDR_TO_KVADDR(new_pte->paddr),
+							(const void*)PADDR_TO_KVADDR(old->paddr),
+								PAGE_SIZE);
 			}else{
-				swapin(old);
-				write_to_disk(PADDR_TO_KVADDR(old->paddr), new_pte->disk_slot);
-				KASSERT(coremap[old->paddr/PAGE_SIZE].page_state == VICTIM);
-				coremap[old->paddr/PAGE_SIZE].page_state = USER;
-
+				read_from_disk(PADDR_TO_KVADDR(new_pte->paddr),old->disk_slot);
 			}
 			lock_release(old->pte_lock);
+			KASSERT(coremap[new_pte->paddr/PAGE_SIZE].page_state == VICTIM);
+			coremap[new_pte->paddr/PAGE_SIZE].page_state = USER;
 
-			if(newas->page_table == NULL){
-				newas->page_table = new_pte;
-			}else{
-				new_pte->next = newas->page_table;
-				newas->page_table = new_pte;
-			}
+			// struct pte *new_pte = kmalloc(sizeof(struct pte));
+			// new_pte->vaddr = old->vaddr;
+			// new_pte->state = DISK;
+			// new_pte->pte_lock = lock_create("pte_lock");
+			// lock_acquire(bm_lock);
+			// int err = bitmap_alloc(swap_table, &new_pte->disk_slot);
+			// if(err){
+			// 	return ENOSPC;
+			// }
+			// lock_release(bm_lock);
+			// new_pte->next = NULL;
+			
+			// lock_acquire(old->pte_lock);
+			// if(old->state == INMEMORY){
+			// 	write_to_disk(PADDR_TO_KVADDR(old->paddr), new_pte->disk_slot);
+			// }else{
+			// 	swapin(old);
+			// 	write_to_disk(PADDR_TO_KVADDR(old->paddr), new_pte->disk_slot);
+			// 	KASSERT(coremap[old->paddr/PAGE_SIZE].page_state == VICTIM);
+			// 	coremap[old->paddr/PAGE_SIZE].page_state = USER;
+
+			// }
+			// lock_release(old->pte_lock);
+
+			// if(newas->page_table == NULL){
+			// 	newas->page_table = new_pte;
+			// }else{
+			// 	new_pte->next = newas->page_table;
+			// 	newas->page_table = new_pte;
+			// }
 		}
 		return 0;
 	}
@@ -272,7 +272,7 @@ void page_table_destroy(struct addrspace *as){
 				if(coremap[currpage->paddr/PAGE_SIZE].page_state == USER){
 					free_upage(currpage->paddr);
 				}else if(coremap[currpage->paddr/PAGE_SIZE].page_state == VICTIM){
-					currpage->state = 	DESTROY;
+					currpage->state = DESTROY;
 					spinlock_release(&cm_spinlock);
 					lock_release(currpage->pte_lock);
 					continue;
