@@ -308,7 +308,6 @@ void tlb_update(vaddr_t faultaddress, paddr_t paddr){
 	}
 
 	splx(spl);
-	// panic("Ran out of TLB entries - cannot handle page fault\n");
 }
 
 static
@@ -324,7 +323,7 @@ struct pte* tlb_fault(vaddr_t faultaddress){
 				if(page_table->state == INMEMORY){
 					paddr = page_table->paddr;
 				}else{
-					// ppn = VPN(swapin(faultaddress));
+
 				}
 				return page_table;
 			}
@@ -353,12 +352,10 @@ struct pte* tlb_fault(vaddr_t faultaddress){
 
 	struct pte *pte = page_table_add(curproc->p_addrspace , faultaddress);
 	if(pte == NULL){
-		// kprintf("faultaddress: here%d\n",faultaddress);
 		return NULL;
 	}
 	paddr = pte->paddr;
 	if(paddr == 0){
-		// kprintf("faultaddress: returning final%d\n",faultaddress);
 		return NULL;
 	}
 	if(swap_enabled == true){
@@ -374,16 +371,14 @@ int valid(vaddr_t faultaddress){
 
 	struct addrspace *as = curproc->p_addrspace;
 	struct segment *segment = as->segment_table;
-	// kprintf("given:%p\n",(void*)faultaddress);
+
 	while(segment!= NULL){
-		// kprintf("checking vbase:%p, vend:%p\n", (void*)segment->vbase, (void*)segment->vend);
 		if(segment->vbase <= faultaddress && faultaddress < segment->vend ){
 			return 1;
 		}
 		segment = segment->next;
 	}
 
-	// kprintf("Fault addr %p\n",(void*)faultaddress);
 	segment = as->heap;
 	if(segment->vbase <= faultaddress && faultaddress < segment->vend ){
 			return 1;
@@ -407,19 +402,15 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 (void)faulttype;
 (void)faultaddress;
 
-// kprintf("Fault addr %p\n",(void*)faultaddress);
 if(!valid(faultaddress)){
-	// kprintf("Fault addr %p\n",(void*)faultaddress);
 	return EFAULT;
 }
 
 struct pte *pte;
 pte = tlb_fault(faultaddress);
 if(pte == NULL){
-	// panic("Fault addr %p\n",(void*)faultaddress);
 	return ENOMEM;
 }
-// kprintf("pddr:%p\n", (void*)paddr);
 
 if(swap_enabled != true){
 	tlb_update(faultaddress, pte->paddr);
