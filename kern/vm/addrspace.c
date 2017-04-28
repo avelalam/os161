@@ -133,6 +133,7 @@ int page_table_copy(struct addrspace *oldas, struct addrspace *newas){
 			}
 			lock_release(old->pte_lock);
 			KASSERT(coremap[new_pte->paddr/PAGE_SIZE].page_state == VICTIM);
+			coremap[new_pte->paddr/PAGE_SIZE].ref = true;
 			coremap[new_pte->paddr/PAGE_SIZE].page_state = USER;
 
 			// struct pte *new_pte = kmalloc(sizeof(struct pte));

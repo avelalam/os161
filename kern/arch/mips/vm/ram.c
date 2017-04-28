@@ -74,8 +74,10 @@ coremap_init(size_t ramsize){
 	for(i=0; i< num_total_pages; i++){
 		if(i<num_kernel_pages){
 			coremap[i].page_state = KERNEL;
+			coremap[i].ref = true;
 		}else{
 			coremap[i].page_state = FREE;
+			coremap[i].ref = false;
 		}
 		coremap[i].chunk_size = 0;
 		coremap[i].pte = NULL;

@@ -20,20 +20,35 @@
 
 unsigned r;
 
+// paddr_t evict_page(void){
+
+// 	for(unsigned i = 0; i<num_total_pages; i++){
+// 		r = (r+1)%num_total_pages;
+// 		if(coremap[r].page_state == USER){
+// 			coremap[r].page_state = VICTIM;
+// 			return r*PAGE_SIZE;
+// 		}
+// 	}
+
+// 	for(unsigned i=0; i<num_total_pages; i++){
+// 		kprintf("%d",coremap[i].page_state );
+// 	}
+// 	panic("no user pages to swapout");
+// }
+
 paddr_t evict_page(void){
 
-	for(unsigned i = 0; i<num_total_pages; i++){
+	while(1){
 		r = (r+1)%num_total_pages;
 		if(coremap[r].page_state == USER){
-			coremap[r].page_state = VICTIM;
-			return r*PAGE_SIZE;
+			if(coremap[r].ref == true){
+				coremap[r].ref = false;
+			}else if(coremap[r].ref == false){
+				coremap[r].page_state = VICTIM;
+				return r*PAGE_SIZE;
+			}
 		}
 	}
-
-	for(unsigned i=0; i<num_total_pages; i++){
-		kprintf("%d",coremap[i].page_state );
-	}
-	panic("no user pages to swapout");
 }
 
 

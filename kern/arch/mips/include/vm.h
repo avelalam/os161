@@ -135,7 +135,7 @@ struct tlbshootdown {
 struct page_entry{
         int page_state;
         size_t chunk_size;
-        vaddr_t vaddr;
+        bool ref;
         struct pte *pte;
 };
 

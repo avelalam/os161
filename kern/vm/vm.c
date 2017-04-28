@@ -335,12 +335,14 @@ struct pte* tlb_fault(vaddr_t faultaddress){
 				lock_acquire(page_table->pte_lock);
 				if(page_table->state == INMEMORY){
 					paddr = page_table->paddr;
+					coremap[page_table->paddr/PAGE_SIZE].ref = true;
 					tlb_update(faultaddress, paddr);
 				}else{
 					KASSERT(swap_enabled == true);
 					paddr = swapin(page_table);
 					tlb_update(faultaddress, paddr);
 					KASSERT(coremap[page_table->paddr/PAGE_SIZE].page_state == VICTIM);
+					coremap[page_table->paddr/PAGE_SIZE].ref = true;
 					coremap[page_table->paddr/PAGE_SIZE].page_state = USER;
 				}
 				lock_release(page_table->pte_lock);
